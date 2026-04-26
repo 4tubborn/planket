@@ -68,8 +68,6 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
     private static final Constructor<?> slotWrapperConstructor;
     @Unique
     private static Field fieldSlotWrapperTarget;
-    @Unique
-    private static final Field slotActiveField;
 
     static {
         try {
@@ -90,28 +88,6 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
             itemsField.set(container, newList);
         } catch (Exception e) {
             throw new RuntimeException("Failed to access SlotWrapper", e);
-        }
-        try {
-            slotActiveField = Slot.class.getDeclaredField("active");
-            slotActiveField.setAccessible(true);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to access Slot.active", e);
-        }
-    }
-
-    //隐藏快捷栏
-    @Unique
-    private void hideHotbarSlots() {
-        if (this.minecraft == null || this.minecraft.player == null || this.menu == null) return;
-        for (Slot slot : this.menu.slots) {
-            // 判定：容器是玩家背包，且在左侧面板内（x < imageWidth），y 坐标较大（约为 112）
-            if (slot.container == this.minecraft.player.getInventory()
-                    && slot.x < this.imageWidth
-                    && slot.y >= 100) {
-                try {
-                    slotActiveField.set(slot, false);
-                } catch (Exception ignored) {}
-            }
         }
     }
 
@@ -141,8 +117,6 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
         if (this.searchBox != null) {
             this.searchBox.setX(this.leftPos + 82);
         }
-
-        hideHotbarSlots();
 
         // ★ 重建物品网格（6 行 × 9 列，移除热键栏）
         /*if (this.menu instanceof CreativeModeInventoryScreen.ItemPickerMenu menu) {
@@ -312,9 +286,22 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
             e.printStackTrace();
         }
 
-        // 移除原版底部热键栏槽位
-        //this.menu.slots.removeIf(s -> s.container != CONTAINER && s.x < this.imageWidth);
-        hideHotbarSlots();
+        // 将原版热键栏槽位替换为 inactive 版本（保留索引，但不可见、不可交互）
+        for (int i = 0; i < this.menu.slots.size(); i++) {
+            Slot slot = this.menu.slots.get(i);
+            if (slot.container == this.minecraft.player.getInventory()
+                    && slot.x < this.imageWidth
+                    && slot.y >= 100) {
+                // 创建新槽位，坐标、容器、索引保持不变，但 isActive() 返回 false
+                Slot inactive = new Slot(slot.container, slot.getContainerSlot(), slot.x, slot.y) {
+                    @Override
+                    public boolean isActive() {
+                        return false;
+                    }
+                };
+                this.menu.slots.set(i, inactive);
+            }
+        }
     }
 
     @Redirect(method = "slotClicked", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/inventory/AbstractContainerMenu;getQuickcraftHeader(I)I"))

@@ -3,30 +3,23 @@
 	"id": "planket",
 	"version": "${version}",
 	"name": "planket",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"description": "Modifies Minecraft creative mode inventory style",
 	"authors": [
-		"Me!"
+		"4tubborn"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"homepage": "https://github.com/4tubborn/planket",
+		"sources": "https://github.com/4tubborn/planket"
 	},
-	"license": "CC0-1.0",
+	"license": "MIT",
 	"icon": "assets/planket/icon.png",
-	"environment": "*",
+	"environment": "client",
 	"entrypoints": {
-		"main": [
-			"stubborn.planket.Planket"
-		],
 		"client": [
 			"stubborn.planket.client.PlanketClient"
-		],
-		"fabric-datagen": [
-			"stubborn.planket.client.PlanketDataGenerator"
 		]
 	},
 	"mixins": [
-		"planket.mixins.json",
 		{
 			"config": "planket.client.mixins.json",
 			"environment": "client"
