@@ -1,0 +1,18 @@
+{
+  "required": true,
+  "package": "stubborn.planket.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "AbstractContainerMenuAccessor",
+    "AbstractContainerMenuInvoker",
+    "MixinCreativeInventoryScreen"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  },
+  "mixins": [
+  ]
+}
