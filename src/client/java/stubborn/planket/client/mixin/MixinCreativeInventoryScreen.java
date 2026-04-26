@@ -1,6 +1,7 @@
 package stubborn.planket.client.mixin;
 
 import com.google.common.collect.ImmutableList;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -10,6 +11,8 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
@@ -29,6 +32,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import stubborn.planket.client.config.PlanketConfig;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -47,9 +51,12 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
     @Shadow private boolean scrolling;
 
     @Shadow protected abstract void selectTab(CreativeModeTab creativeModeTab);
+    @Shadow private float scrollOffs;
 
     @Unique
-    private int actualImageWith = this.imageWidth * 2 ;
+    public int actualImageWidth = this.imageWidth * 2 ;
+    @Unique
+    public int originalTopPos;
 
     public MixinCreativeInventoryScreen(AbstractContainerMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -83,8 +90,8 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
             SimpleContainer container = CONTAINER; // CONTAINER 是你已经 @Shadow 的字段
             Field itemsField = SimpleContainer.class.getDeclaredField("items");
             itemsField.setAccessible(true);
-            NonNullList<ItemStack> newList = NonNullList.createWithCapacity(54);
-            for (int i = 0; i < 54; i++) newList.add(ItemStack.EMPTY);
+            NonNullList<ItemStack> newList = NonNullList.createWithCapacity(108);
+            for (int i = 0; i < 108; i++) newList.add(ItemStack.EMPTY);
             itemsField.set(container, newList);
         } catch (Exception e) {
             throw new RuntimeException("Failed to access SlotWrapper", e);
@@ -109,6 +116,11 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
         return (Slot) slotWrapperConstructor.newInstance(target, index, x, y);
     }
 
+    @Inject(method = "init", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen;selectTab(Lnet/minecraft/world/item/CreativeModeTab;)V", shift = At.Shift.BEFORE))
+    private void captureOriginalTopPos(CallbackInfo ci) {
+        this.originalTopPos = this.topPos;   // 此时 topPos 是原版 136 高度的居中值，且未被我们的逻辑改动过
+    }
+
     @Inject(method = "init", at = @At("RETURN"))
     private void initCustomGrid(CallbackInfo ci) {
         // 原有左移逻辑
@@ -117,33 +129,6 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
         if (this.searchBox != null) {
             this.searchBox.setX(this.leftPos + 82);
         }
-
-        // ★ 重建物品网格（6 行 × 9 列，移除热键栏）
-        /*if (this.menu instanceof CreativeModeInventoryScreen.ItemPickerMenu menu) {
-            // 清空所有现有槽位（物品网格 + 热键栏）
-            menu.slots.clear();
-
-            // 添加 6 行 CustomCreativeSlot
-            for (int row = 0; row < 6; row++) {
-                for (int col = 0; col < 9; col++) {
-                    // 使用反射构造 CustomCreativeSlot
-                    try {
-                        Slot slot = createCustomCreativeSlot(
-                                CONTAINER,
-                                row * 9 + col,
-                                9 + col * 18,
-                                18 + row * 18
-                        );
-                        menu.slots.add(slot);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-
-            // 重要：调用 scrollTo 重新初始化显示
-            menu.scrollTo(0.0F);
-        }*/
     }
 
     @Unique
@@ -160,8 +145,60 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
     }
 
     @Unique
-    private static final net.minecraft.resources.Identifier INVENTORY_TEXTURE =
-            net.minecraft.resources.Identifier.withDefaultNamespace("textures/gui/container/creative_inventory/tab_inventory.png");
+    private static final Identifier INVENTORY_TEXTURE =
+            Identifier.withDefaultNamespace("textures/gui/container/creative_inventory/tab_inventory.png");
+
+    @Redirect(method = "renderBg(Lnet/minecraft/client/gui/GuiGraphics;FII)V",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/client/gui/GuiGraphics;blit(Lcom/mojang/blaze3d/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIFFIIII)V"))
+    private void redirectLeftBackground(GuiGraphics guiGraphics, RenderPipeline pipeline, Identifier texture,
+                                        int x, int y, float u, float v, int width, int height, int texWidth, int texHeight) {
+        int rows = PlanketConfig.getInstance().creativeRows;
+        if (rows <= 5) {
+            // 保留原版完整纹理
+            guiGraphics.blit(pipeline, texture, x, y, u, v, width, height, texWidth, texHeight);
+        } else {
+            drawDynamicLeftBg(guiGraphics, pipeline, texture, x, y);
+        }
+    }
+
+    @Unique
+    private void drawDynamicLeftBg(GuiGraphics guiGraphics, RenderPipeline pipeline, Identifier texture, int leftX, int topY) {
+        int rows = PlanketConfig.getInstance().creativeRows;
+        // 纹理切片坐标
+        int texTopHeight = 89;          // 顶部区域（标题、搜索框、前5行物品背景）
+        int texRowHeight = 18;          // 每额外一行的背景高度
+        int texBottomHeight = 6;        // 底部收尾
+        int texWidth = 194;             // 有效纹理宽度
+
+        int currentY = topY;
+
+        // 1. 顶部区域 (0,0) - 宽 194，高 89
+        guiGraphics.blit(pipeline, texture,
+                leftX, currentY,
+                0, 0,
+                texWidth, texTopHeight,
+                256, 256);
+        currentY += texTopHeight;
+
+        // 2. 额外物品行（第5行到第 rows 行）
+        int extraRows = rows - 4;
+        for (int r = 0; r < extraRows; r++) {
+            guiGraphics.blit(pipeline, texture,
+                    leftX, currentY,
+                    0, 89,               // 单行背景纹理坐标
+                    texWidth, texRowHeight,
+                    256, 256);
+            currentY += texRowHeight;
+        }
+
+        // 3. 底部收尾 (0,129) - 宽 194，高 7
+        guiGraphics.blit(pipeline, texture,
+                leftX, currentY,
+                0, 129,
+                texWidth, 7,
+                256, 256);
+    }
 
     @Inject(method = "renderBg", at = @At("TAIL"))
     private void renderPermanentInventoryBackground(GuiGraphics guiGraphics, float f, int i, int j, CallbackInfo ci) {
@@ -169,7 +206,7 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
         // 使用源码第 428 行相同的参数结构
         // 参数: Pipeline, Texture, x, y, u, v, width, height, textureWidth, textureHeight
         int x = this.leftPos + this.imageWidth;
-        int y = this.topPos;
+        int y = this.originalTopPos;
 
         guiGraphics.blit(
                 RenderPipelines.GUI_TEXTURED,
@@ -199,11 +236,14 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
         // 同时把销毁槽引用置空，避免指向被移除的对象
         this.destroyItemSlot = null;
 
+        rebuildLeftPanel(player);
+
         InventoryMenu survivalMenu = player.inventoryMenu;
         AbstractContainerMenuAccessor menuAccessor = (AbstractContainerMenuAccessor) this.menu;
 
         // 偏移起点：主面板宽度 (195)
         int xOffset = this.imageWidth;
+        int deltaY = this.originalTopPos - this.topPos;
 
         try{
             AbstractContainerMenu abstractContainerMenu = this.minecraft.player.inventoryMenu;
@@ -212,10 +252,8 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
             }
 
             //((CreativeModeInventoryScreen.ItemPickerMenu)this.menu).slots.clear();
-
-            for(int i = 0; i < abstractContainerMenu.slots.size(); ++i) {
-                int n;
-                int j;
+            //原版的浆糊逻辑
+            for(int i = 0; i < abstractContainerMenu.slots.size(); ++i) {int n;int j;
                 if (i >= 5 && i < 9) {
                     int k = i - 5;
                     int l = k / 2;
@@ -240,7 +278,7 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
                     }
                 }
 
-                Slot slot = (Slot) slotWrapperConstructor.newInstance((Slot)abstractContainerMenu.slots.get(i), i, n + xOffset, j);
+                Slot slot = (Slot) slotWrapperConstructor.newInstance((Slot)abstractContainerMenu.slots.get(i), i, n + xOffset, j + deltaY);
 
                 // 用你的 Accessor 添加
                 ((AbstractContainerMenuAccessor)this.menu).callAddSlot(slot);
@@ -250,21 +288,21 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
                 //((CreativeModeInventoryScreen.ItemPickerMenu)this.menu).slots.add(slot);
             }
             // 在 selectTab 的循环之后
-            this.destroyItemSlot = new Slot(CONTAINER, 0, 173 + xOffset, 112) {
+            this.destroyItemSlot = new Slot(CONTAINER, 0, 173 + xOffset, 112 + deltaY) {
                 @Override
-                public void set(net.minecraft.world.item.ItemStack stack) {
+                public void set(ItemStack stack) {
                     // 核心：强制设为空，实现销毁效果
-                    super.set(net.minecraft.world.item.ItemStack.EMPTY);
+                    super.set(ItemStack.EMPTY);
                 }
 
                 @Override
-                public net.minecraft.world.item.ItemStack getItem() {
+                public ItemStack getItem() {
                     // 渲染隔离：强制返回空。即便 ItemPickerMenu 想给你填东西，渲染器在这里也拿不到数据
-                    return net.minecraft.world.item.ItemStack.EMPTY;
+                    return ItemStack.EMPTY;
                 }
 
                 @Override
-                public boolean mayPickup(net.minecraft.world.entity.player.Player player) {
+                public boolean mayPickup(Player player) {
                     // 只能进不能出
                     return false;
                 }
@@ -285,30 +323,91 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
         } catch (Exception e){
             e.printStackTrace();
         }
-
-        // 将原版热键栏槽位替换为 inactive 版本（保留索引，但不可见、不可交互）
-        for (int i = 0; i < this.menu.slots.size(); i++) {
-            Slot slot = this.menu.slots.get(i);
-            if (slot.container == this.minecraft.player.getInventory()
-                    && slot.x < this.imageWidth
-                    && slot.y >= 100) {
-                // 创建新槽位，坐标、容器、索引保持不变，但 isActive() 返回 false
-                Slot inactive = new Slot(slot.container, slot.getContainerSlot(), slot.x, slot.y) {
-                    @Override
-                    public boolean isActive() {
-                        return false;
-                    }
-                };
-                this.menu.slots.set(i, inactive);
-            }
-        }
     }
 
+    @Unique
+    private void rebuildLeftPanel(Player player) {
+        this.menu.slots.removeIf(s -> s.x < this.imageWidth);
+
+        int rows = PlanketConfig.getInstance().creativeRows;
+        // 添加 rows 行物品槽
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < 9; col++) {
+                try {
+                    Slot slot = createCustomCreativeSlot(
+                            CONTAINER,
+                            row * 9 + col,
+                            9 + col * 18,
+                            18 + row * 18
+                    );
+                    ((AbstractContainerMenuAccessor) this.menu).callAddSlot(slot);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        // 不可见热键栏，放置于屏幕外，不参与布局
+        for (int col = 0; col < 9; col++) {
+            Slot invisibleHotbar = new Slot(player.getInventory(), col, 9 + col * 18, -2000) {
+                @Override public boolean isActive() { return false; }
+            };
+            ((AbstractContainerMenuAccessor) this.menu).callAddSlot(invisibleHotbar);
+        }
+
+        ((CreativeModeInventoryScreen.ItemPickerMenu) this.menu).scrollTo(this.scrollOffs);
+
+        int newImageHeight = this.imageHeight;
+        if (rows > 5) {
+            newImageHeight = 18 + rows * 18 + 6;   // 6格/行 + 间隔 + 标签边距
+        }
+
+        // 只有当高度发生变化时才调整垂直位置，避免每次切标签都跳动
+        if (this.imageHeight != newImageHeight) {
+            this.imageHeight = newImageHeight;
+            // 重新居中：根据当前窗口高度和新的界面高度计算 topPos
+            // 注意：leftPos 已在 init 中调整，topPos 需要在父类 init 后修正
+            this.topPos = (this.height - this.imageHeight) / 2;
+        }
+    }
+    //滑块适配>=6行数
+    @Overwrite
+    public boolean insideScrollbar(double d, double e) {
+        int i = this.leftPos;
+        int j = this.topPos;
+        int k = i + 175;
+        int l = j + 18;
+        int m = k + 14;
+        int visibleHeight = this.imageHeight - 18 - 4; // 与背景匹配的可用高度
+        int n = l + visibleHeight;
+        return d >= (double)k && e >= (double)l && d < (double)m && e < (double)n;
+    }
+
+    @Overwrite
+    public boolean mouseDragged(MouseButtonEvent mouseButtonEvent, double d, double e) {
+        if (this.scrolling) {
+            int top = this.topPos + 18;
+            int visibleHeight = this.imageHeight - 18 - 4;   // 与 insideScrollbar 统一
+            int bottom = top + visibleHeight;
+            this.scrollOffs = ((float)mouseButtonEvent.y() - (float)top - 7.5F) / ((float)(bottom - top) - 15.0F);
+            this.scrollOffs = Mth.clamp(this.scrollOffs, 0.0F, 1.0F);
+            ((CreativeModeInventoryScreen.ItemPickerMenu)this.menu).scrollTo(this.scrollOffs);
+            return true;
+        }
+        return super.mouseDragged(mouseButtonEvent, d, e);
+    }
+
+    @ModifyConstant(method = "renderBg", constant = @Constant(intValue = 112, ordinal = 0))
+    private int dynamicScrollbarHeightRender(int original) {
+        return this.imageHeight - 18 - 4;
+    }
+    //滑块结束
+    //禁用快捷栏
     @Redirect(method = "slotClicked", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/inventory/AbstractContainerMenu;getQuickcraftHeader(I)I"))
     private int disableQuickcraftSync(int header) {
         return 0; // 条件 AbstractContainerMenu.getQuickcraftHeader(j) == 2 永远为假
     }
-
+    //重新实现背包槽位shift与垃圾桶逻辑
     @Inject(method = "slotClicked", at = @At("HEAD"), cancellable = true)
     private void onSlotClicked(Slot slot, int slotIndex, int mouseButton, ClickType clickType, CallbackInfo ci) {
         // 1. 搜索框光标（原版逻辑）
@@ -366,21 +465,24 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
     //隐藏type.INVENTORY，为了兼容性，不直接删除而是隐藏
     @Inject(method = "renderTabButton", at = @At("HEAD"), cancellable = true)
     private void hideInventoryTab(GuiGraphics guiGraphics, int i, int j, CreativeModeTab creativeModeTab, CallbackInfo ci) {
-        if (creativeModeTab.getType() == CreativeModeTab.Type.INVENTORY) {
+        if (!PlanketConfig.getInstance().enableInventoryTab &&
+                creativeModeTab.getType() == CreativeModeTab.Type.INVENTORY) {
             ci.cancel();
         }
     }
 
     @Inject(method = "checkTabClicked", at = @At("HEAD"), cancellable = true)
     private void disableInventoryTabClick(CreativeModeTab tab, double d, double e, CallbackInfoReturnable<Boolean> cir) {
-        if (tab.getType() == CreativeModeTab.Type.INVENTORY) {
+        if (!PlanketConfig.getInstance().enableInventoryTab &&
+                tab.getType() == CreativeModeTab.Type.INVENTORY) {
             cir.setReturnValue(false);
         }
     }
 
     @Inject(method = "selectTab", at = @At("HEAD"), cancellable = true)
     private void blockSelectInventoryTab(CreativeModeTab tab, CallbackInfo ci) {
-        if (tab.getType() == CreativeModeTab.Type.INVENTORY) {
+        if (!PlanketConfig.getInstance().enableInventoryTab &&
+                tab.getType() == CreativeModeTab.Type.INVENTORY) {
             // 改为第一个非 Inventory 标签（通常是“建筑方块”等）
             CreativeModeTab defaultTab = CreativeModeTabs.getDefaultTab();
             if (defaultTab.getType() == CreativeModeTab.Type.INVENTORY) {
@@ -395,8 +497,9 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
     }
 
     @Inject(method = "checkTabHovering", at = @At("HEAD"), cancellable = true)
-    private void hideInventoryTabTooltip(GuiGraphics guiGraphics, CreativeModeTab creativeModeTab, int i, int j, CallbackInfoReturnable<Boolean> cir) {
-        if (creativeModeTab.getType() == CreativeModeTab.Type.INVENTORY) {
+    private void hideInventoryTabTooltip(GuiGraphics guiGraphics, CreativeModeTab tab, int i, int j, CallbackInfoReturnable<Boolean> cir) {
+        if (!PlanketConfig.getInstance().enableInventoryTab &&
+                tab.getType() == CreativeModeTab.Type.INVENTORY) {
             cir.setReturnValue(false);
         }
     }
@@ -412,3 +515,4 @@ public abstract class MixinCreativeInventoryScreen extends AbstractContainerScre
         }
     }
 }
+

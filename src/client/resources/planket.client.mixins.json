@@ -5,7 +5,8 @@
   "client": [
     "AbstractContainerMenuAccessor",
     "AbstractContainerMenuInvoker",
-    "MixinCreativeInventoryScreen"
+    "MixinCreativeInventoryScreen",
+    "MixinItemPickerMenu"
   ],
   "injectors": {
     "defaultRequire": 1

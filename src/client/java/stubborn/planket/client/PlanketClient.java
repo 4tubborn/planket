@@ -3,6 +3,7 @@ package stubborn.planket.client;
 import net.fabricmc.api.ClientModInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import stubborn.planket.client.config.PlanketConfig;
 
 public class PlanketClient implements ClientModInitializer {
 	public static final String MOD_ID = "planket";
@@ -15,6 +16,7 @@ public class PlanketClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		// This entrypoint is suitable for setting up client-specific logic, such as rendering.
+		PlanketConfig.load();
 		LOGGER.info("[LOG] Planket initialized");
 	}
 }

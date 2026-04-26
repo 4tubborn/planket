@@ -1,0 +1,7 @@
+{
+  "modmenu.nameTranslation.planket": "Planket",
+  "modmenu.descriptionTranslation.planket": "Check out details on Modrinth.",
+  "modmenu.summaryTranslation.planket": "Modifies creative mode inventory style.",
+  "options.planket.enable_inventory_tab": "Enable Survival Inventory Tab",
+  "options.planket.creative_rows": "Item Rows In Tabs"
+}

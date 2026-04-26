@@ -17,6 +17,9 @@
 	"entrypoints": {
 		"client": [
 			"stubborn.planket.client.PlanketClient"
+		],
+		"modmenu": [
+			"stubborn.planket.client.config.ModMenuCompat"
 		]
 	},
 	"mixins": [
@@ -30,5 +33,13 @@
 		"minecraft": "~1.21.11",
 		"java": ">=21",
 		"fabric-api": "*"
+	},
+	"custom": {
+		"modmenu": {
+			"update_checker": false,
+			"links": {
+				"modmenu.modrinth": "https://modrinth.com/project/hhbbGUwx"
+			}
+		}
 	}
 }

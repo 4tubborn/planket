@@ -1,0 +1,7 @@
+{
+  "modmenu.nameTranslation.planket": "Planket",
+  "modmenu.descriptionTranslation.planket": "更多信息请在Modrinth上查看。",
+  "modmenu.summaryTranslation.planket": "修改了创造物品栏的样式。",
+  "options.planket.enable_inventory_tab": "启用生存模式物品栏标签页",
+  "options.planket.creative_rows": "标签页内物品行数"
+}
