@@ -20,6 +20,9 @@
 		],
 		"modmenu": [
 			"stubborn.planket.client.config.ModMenuCompat"
+		],
+		"main": [
+			"stubborn.planket.Planket"
 		]
 	},
 	"mixins": [
@@ -29,7 +32,7 @@
 		}
 	],
 	"depends": {
-		"fabricloader": ">=0.19.2",
+		"fabricloader": ">=0.17.2",
 		"minecraft": "~1.21.11",
 		"java": ">=21",
 		"fabric-api": "*"
@@ -41,5 +44,6 @@
 				"modmenu.modrinth": "https://modrinth.com/project/hhbbGUwx"
 			}
 		}
-	}
+	},
+	"accessWidener": "planket.accesswidener"
 }

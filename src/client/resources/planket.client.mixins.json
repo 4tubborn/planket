@@ -3,11 +3,12 @@
   "package": "stubborn.planket.client.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "AbstractContainerMenuAccessor",
-    "AbstractContainerMenuInvoker",
-    "MixinPlayerInventoryCreativeInventory",
-    "MixinFixCreativeInventory",
-    "MixinItemPickerMenu"
+    "CreativeInventoryFixMixin",
+    "CreativeTabMixin",
+    "EffectsMixin",
+    "ItemPickerMenuMixin",
+    "CreativeInventoryScreenMixin",
+    "IngredientListOverlayMixin"
   ],
   "injectors": {
     "defaultRequire": 1

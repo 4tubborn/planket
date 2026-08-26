@@ -7,23 +7,22 @@ import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
-import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
-import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -32,16 +31,18 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import stubborn.planket.client.handler.KeyHandler;
+import stubborn.planket.client.util.ScreenInterface;
 import stubborn.planket.client.config.PlanketConfig;
+import static stubborn.planket.client.PlanketClient.LOGGER;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.util.List;
 
+//增加inventory，重构左侧item行。
 @Mixin(CreativeModeInventoryScreen.class)
-public abstract class MixinPlayerInventoryCreativeInventory extends AbstractContainerScreen {
+public abstract class CreativeInventoryScreenMixin extends AbstractContainerScreen implements ScreenInterface {
 
-    @Shadow private EditBox searchBox; // 对应源码第 17 行 [cite: 17]
+    @Shadow private EditBox searchBox; // 对应源码第 17 行[cite: 3]
     @Shadow private static CreativeModeTab selectedTab;
 
     @Shadow protected abstract boolean checkTabClicked(CreativeModeTab tab, double d, double e);
@@ -58,8 +59,12 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
     public int actualImageWidth = this.imageWidth * 2 ;
     @Unique
     public int originalTopPos;
+    @Unique
+    public int inventoryWidth = 195;
+    @Unique
+    public int inventoryHeight = 136;
 
-    public MixinPlayerInventoryCreativeInventory(AbstractContainerMenu menu, Inventory inventory, Component title) {
+    public CreativeInventoryScreenMixin(AbstractContainerMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
     }
 
@@ -70,51 +75,31 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
         cir.setReturnValue(this.hasClickedOutside);
     }
 
-    @Unique
-    private static final Class<?> slotWrapperClass;
-    @Unique
-    private static final Constructor<?> slotWrapperConstructor;
-    @Unique
-    private static Field fieldSlotWrapperTarget;
+    // 已移除反射相关的 Class、Constructor 和 Field 变量[cite: 3]
 
     static {
-        try {
-            slotWrapperClass = Class.forName(
-                    "net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen$SlotWrapper"
-            );
-            slotWrapperConstructor = slotWrapperClass.getDeclaredConstructor(
-                    Slot.class, int.class, int.class, int.class
-            );
-            slotWrapperConstructor.setAccessible(true);
-            fieldSlotWrapperTarget = slotWrapperClass.getDeclaredField("target");
-            fieldSlotWrapperTarget.setAccessible(true);
-            SimpleContainer container = CONTAINER; // CONTAINER 是你已经 @Shadow 的字段
-            Field itemsField = SimpleContainer.class.getDeclaredField("items");
-            itemsField.setAccessible(true);
-            NonNullList<ItemStack> newList = NonNullList.createWithCapacity(108);
-            for (int i = 0; i < 108; i++) newList.add(ItemStack.EMPTY);
-            itemsField.set(container, newList);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to access SlotWrapper", e);
-        }
+        // 移除了反射初始化逻辑，直接配置容器[cite: 3]
+        SimpleContainer container = CONTAINER;
+        NonNullList<ItemStack> newList = NonNullList.createWithCapacity(108);
+        for (int i = 0; i < 108; i++) newList.add(ItemStack.EMPTY);
+        // 注意：由于 SimpleContainer 的 items 字段通常是私有的，
+        // 建议在 accesswidener 中一并开放该字段的访问权限[cite: 3]
+        container.items = newList;
     }
 
     @Unique
     private int getSlotWrapperIndex(Slot slot) {
-        if (slotWrapperClass == null || !slotWrapperClass.isInstance(slot)) {
-            return -1;   // 不是 SlotWrapper（比如垃圾桶），直接返回 -1
+        // 使用 instanceof 替代反射，Loom 会自动处理混淆[cite: 3]
+        if (slot instanceof CreativeModeInventoryScreen.SlotWrapper wrapper) {
+            return wrapper.target.index;
         }
-        try {
-            Slot targetSlot = (Slot) fieldSlotWrapperTarget.get(slot);
-            return targetSlot.index;
-        } catch (IllegalAccessException e) {
-            return -1;
-        }
+        return -1;
     }
 
     @Unique
-    private Slot createWrapper(Slot target, int index, int x, int y) throws Exception {
-        return (Slot) slotWrapperConstructor.newInstance(target, index, x, y);
+    private Slot createWrapper(Slot target, int index, int x, int y) {
+        // 直接使用 new 关键字，前提是已在 accesswidener 中开放构造函数[cite: 3]
+        return new CreativeModeInventoryScreen.SlotWrapper(target, index, x, y);
     }
 
     @Inject(method = "init", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen;selectTab(Lnet/minecraft/world/item/CreativeModeTab;)V", shift = At.Shift.BEFORE))
@@ -124,25 +109,24 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
 
     @Inject(method = "init", at = @At("RETURN"))
     private void initCustomGrid(CallbackInfo ci) {
-        // 原有左移逻辑
+        // 左移逻辑
         int offset = 100;
         this.leftPos -= offset;
         if (this.searchBox != null) {
             this.searchBox.setX(this.leftPos + 82);
         }
+        //搜索框复位
+        if (this.searchBox != null) {
+            this.searchBox.setX(this.leftPos + 82);
+            // 完美对齐原版：当前真正居中后的 topPos + 6
+            this.searchBox.setY(this.topPos + 6);
+        }
     }
 
     @Unique
-    private static Slot createCustomCreativeSlot(SimpleContainer container, int index, int x, int y) throws Exception {
-        // 反射获取 CustomCreativeSlot 的构造器（私有内部类）
-        Class<?> customSlotClass = Class.forName(
-                "net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen$CustomCreativeSlot"
-        );
-        Constructor<?> ctor = customSlotClass.getDeclaredConstructor(
-                Container.class, int.class, int.class, int.class
-        );
-        ctor.setAccessible(true);
-        return (Slot) ctor.newInstance(container, index, x, y);
+    private static Slot createCustomCreativeSlot(SimpleContainer container, int index, int x, int y) {
+        // 同样直接 new，前提是已在 accesswidener 中开放构造函数[cite: 3]
+        return new CreativeModeInventoryScreen.CustomCreativeSlot(container, index, x, y);
     }
 
     @Unique
@@ -169,8 +153,8 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
         // 纹理切片坐标
         int texTopHeight = 89;          // 顶部区域（标题、搜索框、前5行物品背景）
         int texRowHeight = 18;          // 每额外一行的背景高度
-        int texBottomHeight = 6;        // 底部收尾
-        int texWidth = 194;             // 有效纹理宽度
+        int texBottomHeight = 8;        // 底部收尾
+        int texWidth = 195;             // 有效纹理宽度
 
         int currentY = topY;
 
@@ -199,7 +183,7 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
         guiGraphics.blit(pipeline, texture,
                 leftX, currentY,
                 0, 128,
-                texWidth, 8,
+                texWidth, texBottomHeight,
                 256, 256);
     }
 
@@ -232,7 +216,7 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
     @Inject(method = "selectTab", at = @At("TAIL"))
     private void addPermanentSlots(CreativeModeTab tab, CallbackInfo ci) {
         Player player = this.minecraft.player;
-        if (player == null || this.menu == null || slotWrapperConstructor == null) return;
+        if (player == null || this.menu == null) return; // 移除 slotWrapperConstructor 的 null 检查[cite: 3]
 
         // ★ 清除上一次残留的右侧面板槽位（包括旧的垃圾桶）
         this.menu.slots.removeIf(slot -> slot.x >= this.imageWidth);
@@ -240,9 +224,6 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
         this.destroyItemSlot = null;
 
         rebuildLeftPanel(player);
-
-        InventoryMenu survivalMenu = player.inventoryMenu;
-        AbstractContainerMenuAccessor menuAccessor = (AbstractContainerMenuAccessor) this.menu;
 
         // 偏移起点：主面板宽度 (195)
         int xOffset = this.imageWidth;
@@ -254,7 +235,6 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
                 this.originalSlots = ImmutableList.copyOf(((CreativeModeInventoryScreen.ItemPickerMenu)this.menu).slots);
             }
 
-            //((CreativeModeInventoryScreen.ItemPickerMenu)this.menu).slots.clear();
             //原版的浆糊逻辑
             for(int i = 0; i < abstractContainerMenu.slots.size(); ++i) {int n;int j;
                 if (i >= 5 && i < 9) {
@@ -281,14 +261,11 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
                     }
                 }
 
-                Slot slot = (Slot) slotWrapperConstructor.newInstance((Slot)abstractContainerMenu.slots.get(i), i, n + xOffset, j + deltaY);
+                // 直接实例化 SlotWrapper[cite: 3]
+                Slot slot = new CreativeModeInventoryScreen.SlotWrapper(abstractContainerMenu.slots.get(i), i, n + xOffset, j + deltaY);
 
-                // 用你的 Accessor 添加
-                ((AbstractContainerMenuAccessor)this.menu).callAddSlot(slot);
 
-                //Slot slot = new CreativeModeInventoryScreen.SlotWrapper((Slot)abstractContainerMenu.slots.get(i), i, xOffset+n, j);
-                //menuAccessor.callAddSlot(createWrapper(survivalMenu.getSlot(i), i, xOffset + 9 + j * 18, 54 + i * 18));
-                //((CreativeModeInventoryScreen.ItemPickerMenu)this.menu).slots.add(slot);
+                this.menu.addSlot(slot);
             }
             // 在 selectTab 的循环之后
             this.destroyItemSlot = new Slot(CONTAINER, 0, 173 + xOffset, 112 + deltaY) {
@@ -317,14 +294,10 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
                 }
             };
 
-            ((AbstractContainerMenuAccessor)this.menu).callAddSlot(this.destroyItemSlot);
-
-            //this.destroyItemSlot = new Slot(CONTAINER, 0, 173 + xOffset, 112);
-            //this.menu.slots.add(this.destroyItemSlot);
-            //((AbstractContainerMenuAccessor)this.menu).callAddSlot(this.destroyItemSlot);
+            this.menu.addSlot(this.destroyItemSlot);
 
         } catch (Exception e){
-            e.printStackTrace();
+            LOGGER.error("Errors when trying to add inventory slots: ", e);
         }
     }
 
@@ -343,9 +316,9 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
                             9 + col * 18,
                             18 + row * 18
                     );
-                    ((AbstractContainerMenuAccessor) this.menu).callAddSlot(slot);
+                    this.menu.addSlot(slot);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    LOGGER.error("Errors when trying to rebuild left tab panel: ", e);
                 }
             }
         }
@@ -355,7 +328,7 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
             Slot invisibleHotbar = new Slot(player.getInventory(), col, 9 + col * 18, -2000) {
                 @Override public boolean isActive() { return false; }
             };
-            ((AbstractContainerMenuAccessor) this.menu).callAddSlot(invisibleHotbar);
+            this.menu.addSlot(invisibleHotbar);
         }
 
         ((CreativeModeInventoryScreen.ItemPickerMenu) this.menu).scrollTo(this.scrollOffs);
@@ -374,6 +347,10 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
         }
     }
     //滑块适配>=6行数
+    /**
+     * @author
+     * @reason
+     */
     @Overwrite
     public boolean insideScrollbar(double d, double e) {
         int i = this.leftPos;
@@ -386,6 +363,10 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
         return d >= (double)k && e >= (double)l && d < (double)m && e < (double)n;
     }
 
+    /**
+     * @author
+     * @reason
+     */
     @Overwrite
     public boolean mouseDragged(MouseButtonEvent mouseButtonEvent, double d, double e) {
         if (this.scrolling) {
@@ -413,12 +394,6 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
     //重新实现背包槽位shift与垃圾桶逻辑
     @Inject(method = "slotClicked", at = @At("HEAD"), cancellable = true)
     private void onSlotClicked(Slot slot, int slotIndex, int mouseButton, ClickType clickType, CallbackInfo ci) {
-        // 1. 搜索框光标（原版逻辑）
-        /*if (this.isCreativeSlot(slot)) {
-            this.searchBox.moveCursorToEnd(false);
-            this.searchBox.setHighlightPos(0);
-        }*/
-
         // 2. 垃圾桶处理
         if (slot == this.destroyItemSlot && slot.container == CONTAINER) {
             if (clickType == ClickType.QUICK_MOVE) {
@@ -449,10 +424,8 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
             }
             ci.cancel();
         }
-
-
-        // 注意：其他所有情况（左侧物品网格、普通点击、投掷等）都不 cancel，原版逻辑会完美执行
     }
+
     //同步到生存模式物品栏，但是有点屎山，可能会改
     @Inject(method = "slotClicked", at = @At("TAIL"))
     private void onSlotClickedTail(Slot slot, int slotIndex, int mouseButton, ClickType clickType, CallbackInfo ci) {
@@ -463,5 +436,38 @@ public abstract class MixinPlayerInventoryCreativeInventory extends AbstractCont
                 this.minecraft.player.inventoryMenu.broadcastChanges();
             }
         }
+    }
+
+    @Override
+    public int planket$getInventoryTopPos() {
+        return this.originalTopPos;
+    }
+
+    @Override
+    public int planket$getInventoryWidth() {
+        return this.inventoryWidth;
+    }
+
+    @Override
+    public int planket$getInventoryHeight() {
+        return this.inventoryHeight;
+    }
+
+    // 注入到 keyPressed 方法的首部
+    @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
+    public void keyPressed(@NotNull KeyEvent event, CallbackInfoReturnable<Boolean> cir) {
+        // 转发给独立的快捷键类处理
+        if (KeyHandler.handleKeyPressed((CreativeModeInventoryScreen)(Object)this, event)) {
+            cir.setReturnValue(true); // 如果内部处理了，直接截断事件
+        }
+
+        cir.setReturnValue(super.keyPressed(event));
+    }
+
+    // 追踪非快捷键导致的标签页变更（比如鼠标点击标签页时，也能被 Ctrl+L 记录）
+    @Inject(method = "selectTab", at = @At("HEAD"))
+    private void onPreSelectTab(CreativeModeTab tab, CallbackInfo ci) {
+        // 在标签页即将被改变前，把当前的页更新到快捷键历史缓存中
+        KeyHandler.updateLastTab(selectedTab);
     }
 }

@@ -5,11 +5,6 @@ plugins {
 	id 'maven-publish'
 }
 
-System.setProperty("https.proxyHost", "127.0.0.1")
-System.setProperty("https.proxyPort", "6984")
-System.setProperty("http.proxyHost", "127.0.0.1")
-System.setProperty("http.proxyPort", "6984")
-
 version = project.mod_version
 group = project.maven_group
 
@@ -25,6 +20,17 @@ repositories {
 		name = "Terraformers"
 		url = "https://maven.terraformersmc.com/"
 	}
+
+	maven {
+		// location of the maven that hosts JEI files since January 2023
+		name = "Jared's maven"
+		url = "https://maven.blamejared.com/"
+	}
+	maven {
+		// location of a maven mirror for JEI files, as a fallback
+		name = "ModMaven"
+		url = "https://modmaven.dev"
+	}
 }
 
 loom {
@@ -36,6 +42,9 @@ loom {
 			sourceSet sourceSets.client
 		}
 	}
+
+	accessWidenerPath = file("src/main/resources/planket.accesswidener")
+
 
 }
 
@@ -56,6 +65,12 @@ dependencies {
 
 	// Prior to Minecraft 26.x, use "modImplementation" instead
 	modImplementation("com.terraformersmc:modmenu:${project.modmenu_version}")
+
+	// compile against the JEI API but do not include it at runtime
+	//modCompileOnly("mezz.jei:jei-${minecraft_version}-fabric-api:${jei_version}")
+	modCompileOnly("mezz.jei:jei-${minecraft_version}-fabric:${jei_version}")
+	// at runtime, use the full JEI jar for Fabric
+	modRuntimeOnly("mezz.jei:jei-${minecraft_version}-fabric:${jei_version}")
 }
 
 processResources {

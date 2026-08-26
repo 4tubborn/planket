@@ -12,32 +12,21 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import stubborn.planket.client.config.PlanketConfig;
 
-import java.lang.reflect.Field;
-
+//修复scroll
 @Mixin(targets = "net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen$ItemPickerMenu")
-public abstract class MixinItemPickerMenu extends AbstractContainerMenu {
+public abstract class ItemPickerMenuMixin extends AbstractContainerMenu {
 
     @Shadow public NonNullList<ItemStack> items;
 
-    // 反射获取外部类的静态容器
-    private static final SimpleContainer CONTAINER;
+    private static final SimpleContainer CONTAINER = CreativeModeInventoryScreen.CONTAINER;
 
-    static {
-        try {
-            Field containerField = CreativeModeInventoryScreen.class.getDeclaredField("CONTAINER");
-            containerField.setAccessible(true);
-            CONTAINER = (SimpleContainer) containerField.get(null);
-        } catch (Exception e) {
-            throw new RuntimeException("Cannot access CONTAINER", e);
-        }
-    }
 
-    protected MixinItemPickerMenu(MenuType<?> type, int id) {
+    protected ItemPickerMenuMixin(MenuType<?> type, int id) {
         super(type, id);
     }
 
     /**
-     * @author Planket
+     * @author 4tubborn
      * @reason 行数由配置决定
      */
     @Overwrite
@@ -57,7 +46,7 @@ public abstract class MixinItemPickerMenu extends AbstractContainerMenu {
     }
 
     /**
-     * @author Planket
+     * @author 4tubborn
      * @reason 计算行数适配配置
      */
     @Overwrite
@@ -66,7 +55,7 @@ public abstract class MixinItemPickerMenu extends AbstractContainerMenu {
     }
 
     /**
-     * @author Planket
+     * @author 4tubborn
      * @reason 滚动阈值根据配置行数变化
      */
     @Overwrite

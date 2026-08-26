@@ -1,0 +1,24 @@
+accessWidener v2 named
+
+# 允许修改 SimpleContainer 中的 items 字段 (添加 mutable 解决 final 问题)
+accessible field net/minecraft/world/SimpleContainer	items	Lnet/minecraft/core/NonNullList;
+mutable	field net/minecraft/world/SimpleContainer	items	Lnet/minecraft/core/NonNullList;
+
+# 允许访问 CreativeModeInventoryScreen 的私有内部类及其构造函数
+accessible class net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen$SlotWrapper
+accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen$SlotWrapper	<init>	(Lnet/minecraft/world/inventory/Slot;III)V
+accessible field net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen$SlotWrapper	target	Lnet/minecraft/world/inventory/Slot;
+
+accessible	class	net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen$CustomCreativeSlot
+accessible	method	net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen$CustomCreativeSlot	<init>	(Lnet/minecraft/world/Container;III)V
+
+accessible field net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen CONTAINER Lnet/minecraft/world/SimpleContainer;
+
+accessible method net/minecraft/world/inventory/AbstractContainerMenu addSlot (Lnet/minecraft/world/inventory/Slot;)Lnet/minecraft/world/inventory/Slot;
+
+accessible field net/minecraft/client/gui/screens/inventory/AbstractContainerScreen leftPos I
+accessible field net/minecraft/client/gui/screens/inventory/AbstractContainerScreen imageWidth I
+accessible field net/minecraft/client/gui/screens/inventory/AbstractContainerScreen topPos I
+
+accessible field net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen selectedTab Lnet/minecraft/world/item/CreativeModeTab;
+accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen selectTab (Lnet/minecraft/world/item/CreativeModeTab;)V

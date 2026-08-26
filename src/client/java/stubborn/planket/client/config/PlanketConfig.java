@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
 
+import static stubborn.planket.client.PlanketClient.LOGGER;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,7 +32,7 @@ public class PlanketConfig {
                 String json = Files.readString(CONFIG_PATH);
                 INSTANCE = GSON.fromJson(json, PlanketConfig.class);
             } catch (IOException e) {
-                e.printStackTrace();
+                LOGGER.error("Errors when trying to load config: ", e);
                 INSTANCE = new PlanketConfig();
             }
         } else {
@@ -44,7 +46,7 @@ public class PlanketConfig {
             Files.createDirectories(CONFIG_PATH.getParent());
             Files.writeString(CONFIG_PATH, GSON.toJson(this));
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.error("Errors when trying to save config: ", e);
         }
     }
 }
