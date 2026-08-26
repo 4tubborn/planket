@@ -14,17 +14,6 @@ import  net.fabricmc.fabric.api.client.itemgroup.v1.FabricCreativeInventoryScree
 import java.util.List;
 
 public class KeyHandler {
-    // 记录上一次选中的标签页，用于 Ctrl + L 回滚和记忆
-    private static CreativeModeTab lastSelectedTab = null;
-
-    /**
-     * 当标签页发生改变时调用，用来追踪历史记录
-     */
-    public static void updateLastTab(CreativeModeTab currentTab) {
-        if (currentTab != null && currentTab != lastSelectedTab) {
-            lastSelectedTab = currentTab;
-        }
-    }
 
     /**
      * 核心快捷键路由方法
@@ -86,9 +75,21 @@ public class KeyHandler {
             } else {
                 int target = keyCode - GLFW.GLFW_KEY_1;
 
-                if (target < pageTabs.size()) {
-                    switchToTab(screen, pageTabs.get(target));
-                }
+                if (target >= pageTabs.size()) {target = pageTabs.size() - 1;}
+
+                switchToTab(screen, pageTabs.get(target));
+            }
+
+            return true;
+        }
+
+        // Ctrl + F
+        if (keyCode == GLFW.GLFW_KEY_F) {
+            //若不存在search tab原版会直接throw
+            CreativeModeTab searchTab = CreativeModeTabs.searchTab();
+
+            if (searchTab.shouldDisplay()) {
+                switchToTab(screen, searchTab);
             }
 
             return true;
@@ -97,16 +98,16 @@ public class KeyHandler {
         // Ctrl + L
         if (keyCode == GLFW.GLFW_KEY_L) {
 
-            if (lastSelectedTab != null) {
+            if (CreativeScrollManager.lastSelectedTab != null) {
 
-                int targetPage = ext.getPage(lastSelectedTab);
+                int targetPage = ext.getPage(CreativeScrollManager.lastSelectedTab);
 
                 if (pageCount > 1 && targetPage != currentPage) {
                     ext.switchToPage(targetPage);
                     //screen.updateLayout();
                 }
 
-                switchToTab(screen, lastSelectedTab);
+                switchToTab(screen, CreativeScrollManager.lastSelectedTab);
             }
 
             return true;
@@ -150,17 +151,15 @@ public class KeyHandler {
             return;
         }
 
-        FabricCreativeInventoryScreen ext = screen;
-
-        CreativeModeTab current = ext.getSelectedItemGroup();
+        CreativeModeTab current = screen.getSelectedItemGroup();
 
         if (current == targetTab) {
             return;
         }
 
-        lastSelectedTab = current;
+        CreativeScrollManager.lastSelectedTab = current;
 
-        ext.setSelectedItemGroup(targetTab);
+        screen.setSelectedItemGroup(targetTab);
 
         screen.selectTab(targetTab);
     }

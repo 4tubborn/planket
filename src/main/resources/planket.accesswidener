@@ -22,3 +22,5 @@ accessible field net/minecraft/client/gui/screens/inventory/AbstractContainerScr
 
 accessible field net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen selectedTab Lnet/minecraft/world/item/CreativeModeTab;
 accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen selectTab (Lnet/minecraft/world/item/CreativeModeTab;)V
+
+accessible field net/minecraft/client/gui/screens/inventory/AbstractContainerScreen menu Lnet/minecraft/world/inventory/AbstractContainerMenu;

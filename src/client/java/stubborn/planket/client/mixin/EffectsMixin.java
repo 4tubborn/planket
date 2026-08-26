@@ -53,12 +53,6 @@ public class EffectsMixin {
         this.minecraft = minecraft;
     }
 
-
-
-    /**
-     * @author
-     * @reason
-     */
     @Inject(method = "render", at = @At("HEAD"), cancellable = true)
     public void render(GuiGraphics guiGraphics, int i, int j, CallbackInfo ci) {
         Collection<MobEffectInstance> collection = this.minecraft.player.getActiveEffects();
@@ -181,46 +175,4 @@ public class EffectsMixin {
             currentX += actualWidth + GAP;
         }
     }
-
-    /**
-     * @author
-     * @reason
-     */
-    /*@Overwrite
-    public void render(GuiGraphics guiGraphics, int i, int j) {
-        int k = this.screen.leftPos + this.screen.imageWidth + 2;
-        int l = this.screen.width - k;
-        Collection<MobEffectInstance> collection = this.minecraft.player.getActiveEffects();
-        if (!collection.isEmpty() && l >= 32) {
-            int m = l >= 120 ? l - 7 : 32;
-            int n = 33;
-            if (collection.size() > 5) {
-                n = 132 / (collection.size() - 1);
-            }
-
-            this.renderEffects(guiGraphics, collection, k, n, i, j, m);
-        }
-    }*/
-
-    /**
-     * @author
-     * @reason
-     */
-    /*@Overwrite
-    private void renderEffects(GuiGraphics guiGraphics, Collection<MobEffectInstance> collection, int i, int j, int k, int l, int m) {
-        Iterable<MobEffectInstance> iterable = Ordering.natural().sortedCopy(collection);
-        int n = ((PlanketScreenInterface)this.screen).planket$getInventoryTopPos() + ((PlanketScreenInterface)this.screen).planket$getInventoryHeight();
-        Font font = this.screen.getFont();
-
-        for(MobEffectInstance mobEffectInstance : iterable) {
-            boolean bl = mobEffectInstance.isAmbient();
-            Component component = this.getEffectName(mobEffectInstance);
-            Component component2 = MobEffectUtil.formatDuration(mobEffectInstance, 1.0F, this.minecraft.level.tickRateManager().tickrate());
-            int o = this.renderBackground(guiGraphics, font, component, component2, i, n, bl, m);
-            this.renderText(guiGraphics, component, component2, font, i, n, o, j, k, l);
-            guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, Gui.getMobEffectSprite(mobEffectInstance.getEffect()), i + 7, n + 7, 18, 18);
-            n += j;
-        }
-
-    }*/
 }

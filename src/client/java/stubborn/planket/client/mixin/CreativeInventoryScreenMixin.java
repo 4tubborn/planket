@@ -23,14 +23,15 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import stubborn.planket.client.handler.CreativeScrollManager;
 import stubborn.planket.client.handler.KeyHandler;
 import stubborn.planket.client.util.ScreenInterface;
 import stubborn.planket.client.config.PlanketConfig;
@@ -43,13 +44,13 @@ import java.util.List;
 public abstract class CreativeInventoryScreenMixin extends AbstractContainerScreen implements ScreenInterface {
 
     @Shadow private EditBox searchBox; // 对应源码第 17 行[cite: 3]
-    @Shadow private static CreativeModeTab selectedTab;
+    @Shadow public static CreativeModeTab selectedTab;
 
     @Shadow protected abstract boolean checkTabClicked(CreativeModeTab tab, double d, double e);
     @Shadow private boolean hasClickedOutside;
     @Shadow private @Nullable List<Slot> originalSlots;
     @Shadow private @Nullable Slot destroyItemSlot;
-    @Shadow static final SimpleContainer CONTAINER = new SimpleContainer(45);
+    @Shadow public static final SimpleContainer CONTAINER = new SimpleContainer(45);
     @Shadow private boolean scrolling;
 
     @Shadow protected abstract void selectTab(CreativeModeTab creativeModeTab);
@@ -79,12 +80,11 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 
     static {
         // 移除了反射初始化逻辑，直接配置容器[cite: 3]
-        SimpleContainer container = CONTAINER;
         NonNullList<ItemStack> newList = NonNullList.createWithCapacity(108);
         for (int i = 0; i < 108; i++) newList.add(ItemStack.EMPTY);
         // 注意：由于 SimpleContainer 的 items 字段通常是私有的，
         // 建议在 accesswidener 中一并开放该字段的访问权限[cite: 3]
-        container.items = newList;
+        CONTAINER.items = newList;
     }
 
     @Unique
@@ -94,12 +94,6 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
             return wrapper.target.index;
         }
         return -1;
-    }
-
-    @Unique
-    private Slot createWrapper(Slot target, int index, int x, int y) {
-        // 直接使用 new 关键字，前提是已在 accesswidener 中开放构造函数[cite: 3]
-        return new CreativeModeInventoryScreen.SlotWrapper(target, index, x, y);
     }
 
     @Inject(method = "init", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen;selectTab(Lnet/minecraft/world/item/CreativeModeTab;)V", shift = At.Shift.BEFORE))
@@ -124,9 +118,9 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
     }
 
     @Unique
-    private static Slot createCustomCreativeSlot(SimpleContainer container, int index, int x, int y) {
+    private static Slot createCustomCreativeSlot(int index, int x, int y) {
         // 同样直接 new，前提是已在 accesswidener 中开放构造函数[cite: 3]
-        return new CreativeModeInventoryScreen.CustomCreativeSlot(container, index, x, y);
+        return new CreativeModeInventoryScreen.CustomCreativeSlot(CreativeInventoryScreenMixin.CONTAINER, index, x, y);
     }
 
     @Unique
@@ -216,7 +210,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
     @Inject(method = "selectTab", at = @At("TAIL"))
     private void addPermanentSlots(CreativeModeTab tab, CallbackInfo ci) {
         Player player = this.minecraft.player;
-        if (player == null || this.menu == null) return; // 移除 slotWrapperConstructor 的 null 检查[cite: 3]
+        if (player == null) return; // 移除 slotWrapperConstructor 的 null 检查[cite: 3]
 
         // ★ 清除上一次残留的右侧面板槽位（包括旧的垃圾桶）
         this.menu.slots.removeIf(slot -> slot.x >= this.imageWidth);
@@ -243,7 +237,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
                     int m = k % 2;
                     n = 54 + l * 54;
                     j = 6 + m * 27;
-                } else if (i >= 0 && i < 5) {
+                } else if (i < 5) {
                     n = -2000;
                     j = -2000;
                 } else if (i == 45) {
@@ -261,7 +255,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
                     }
                 }
 
-                // 直接实例化 SlotWrapper[cite: 3]
+                // 直接实例化 SlotWrapper
                 Slot slot = new CreativeModeInventoryScreen.SlotWrapper(abstractContainerMenu.slots.get(i), i, n + xOffset, j + deltaY);
 
 
@@ -270,19 +264,19 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
             // 在 selectTab 的循环之后
             this.destroyItemSlot = new Slot(CONTAINER, 0, 173 + xOffset, 112 + deltaY) {
                 @Override
-                public void set(ItemStack stack) {
+                public void set(@NonNull ItemStack stack) {
                     // 核心：强制设为空，实现销毁效果
                     super.set(ItemStack.EMPTY);
                 }
 
                 @Override
-                public ItemStack getItem() {
+                public @NonNull ItemStack getItem() {
                     // 渲染隔离：强制返回空。即便 ItemPickerMenu 想给你填东西，渲染器在这里也拿不到数据
                     return ItemStack.EMPTY;
                 }
 
                 @Override
-                public boolean mayPickup(Player player) {
+                public boolean mayPickup(@NonNull Player player) {
                     // 只能进不能出
                     return false;
                 }
@@ -311,7 +305,6 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
             for (int col = 0; col < 9; col++) {
                 try {
                     Slot slot = createCustomCreativeSlot(
-                            CONTAINER,
                             row * 9 + col,
                             9 + col * 18,
                             18 + row * 18
@@ -347,38 +340,29 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
         }
     }
     //滑块适配>=6行数
-    /**
-     * @author
-     * @reason
-     */
-    @Overwrite
-    public boolean insideScrollbar(double d, double e) {
-        int i = this.leftPos;
-        int j = this.topPos;
-        int k = i + 175;
-        int l = j + 18;
-        int m = k + 14;
-        int visibleHeight = this.imageHeight - 18 - 6; // 与背景匹配的可用高度
-        int n = l + visibleHeight;
-        return d >= (double)k && e >= (double)l && d < (double)m && e < (double)n;
+    @ModifyConstant(
+            method = "insideScrollbar",
+            constant = @Constant(intValue = 112)
+    )
+    private int modifyScrollbarHeight(int original) {
+        return this.imageHeight - 18 - 6;
     }
 
-    /**
-     * @author
-     * @reason
-     */
-    @Overwrite
-    public boolean mouseDragged(MouseButtonEvent mouseButtonEvent, double d, double e) {
-        if (this.scrolling) {
-            int top = this.topPos + 18;
-            int visibleHeight = this.imageHeight - 18 - 6;   // 与 insideScrollbar 统一
-            int bottom = top + visibleHeight;
-            this.scrollOffs = ((float)mouseButtonEvent.y() - (float)top - 7.5F) / ((float)(bottom - top) - 15.0F);
-            this.scrollOffs = Mth.clamp(this.scrollOffs, 0.0F, 1.0F);
-            ((CreativeModeInventoryScreen.ItemPickerMenu)this.menu).scrollTo(this.scrollOffs);
-            return true;
-        }
-        return super.mouseDragged(mouseButtonEvent, d, e);
+    @Inject(
+            method = "mouseDragged",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    public void mouseDragged(MouseButtonEvent mouseButtonEvent, double d, double e, CallbackInfoReturnable<Boolean> cir) {
+        if (!this.scrolling) return;
+
+        int top = this.topPos + 18;
+        int visibleHeight = this.imageHeight - 18 - 6;   // 与 insideScrollbar 统一
+        int bottom = top + visibleHeight;
+        this.scrollOffs = ((float)mouseButtonEvent.y() - (float)top - 7.5F) / ((float)(bottom - top) - 15.0F);
+        this.scrollOffs = Mth.clamp(this.scrollOffs, 0.0F, 1.0F);
+        ((CreativeModeInventoryScreen.ItemPickerMenu)this.menu).scrollTo(this.scrollOffs);
+        cir.setReturnValue(true);
     }
 
     @ModifyConstant(method = "renderBg", constant = @Constant(intValue = 112, ordinal = 0))
@@ -462,12 +446,5 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
         }
 
         cir.setReturnValue(super.keyPressed(event));
-    }
-
-    // 追踪非快捷键导致的标签页变更（比如鼠标点击标签页时，也能被 Ctrl+L 记录）
-    @Inject(method = "selectTab", at = @At("HEAD"))
-    private void onPreSelectTab(CreativeModeTab tab, CallbackInfo ci) {
-        // 在标签页即将被改变前，把当前的页更新到快捷键历史缓存中
-        KeyHandler.updateLastTab(selectedTab);
     }
 }

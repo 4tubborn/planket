@@ -4,11 +4,12 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "CreativeInventoryFixMixin",
+    "CreativeInventoryScreenMixin",
+    "CreativeScrollMixin",
     "CreativeTabMixin",
     "EffectsMixin",
-    "ItemPickerMenuMixin",
-    "CreativeInventoryScreenMixin",
-    "IngredientListOverlayMixin"
+    "IngredientListOverlayMixin",
+    "ItemPickerMenuMixin"
   ],
   "injectors": {
     "defaultRequire": 1

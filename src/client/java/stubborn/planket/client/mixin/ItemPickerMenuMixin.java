@@ -1,66 +1,59 @@
 package stubborn.planket.client.mixin;
 
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.core.NonNullList;
 import net.minecraft.util.Mth;
-import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Constant;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import stubborn.planket.client.config.PlanketConfig;
 
-//修复scroll
 @Mixin(targets = "net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen$ItemPickerMenu")
 public abstract class ItemPickerMenuMixin extends AbstractContainerMenu {
 
-    @Shadow public NonNullList<ItemStack> items;
-
-    private static final SimpleContainer CONTAINER = CreativeModeInventoryScreen.CONTAINER;
-
+    @Final
+    @Shadow
+    public NonNullList<ItemStack> items;
 
     protected ItemPickerMenuMixin(MenuType<?> type, int id) {
         super(type, id);
     }
 
-    /**
-     * @author 4tubborn
-     * @reason 行数由配置决定
-     */
-    @Overwrite
-    public void scrollTo(float f) {
+    @ModifyReturnValue(
+            method = "calculateRowCount",
+            at = @At("RETURN")
+    )
+    private int planket$modifyRowCount(int original) {
         int rows = PlanketConfig.getInstance().creativeRows;
-        int rowIndex = Math.max((int)((double)(f * (float)this.calculateRowCount()) + 0.5), 0);
-        for (int j = 0; j < rows; ++j) {
-            for (int k = 0; k < 9; ++k) {
-                int idx = k + (j + rowIndex) * 9;
-                if (idx >= 0 && idx < this.items.size()) {
-                    CONTAINER.setItem(k + j * 9, this.items.get(idx));
-                } else {
-                    CONTAINER.setItem(k + j * 9, ItemStack.EMPTY);
-                }
-            }
-        }
+
+        return Math.max(
+                Mth.positiveCeilDiv(this.items.size(), 9) - rows,
+                0
+        );
     }
 
-    /**
-     * @author 4tubborn
-     * @reason 计算行数适配配置
-     */
-    @Overwrite
-    public int calculateRowCount() {
-        return Mth.positiveCeilDiv(this.items.size(), 9) - PlanketConfig.getInstance().creativeRows;
-    }
-
-    /**
-     * @author 4tubborn
-     * @reason 滚动阈值根据配置行数变化
-     */
-    @Overwrite
-    public boolean canScroll() {
+    @ModifyReturnValue(
+            method = "canScroll",
+            at = @At("RETURN")
+    )
+    private boolean planket$modifyCanScroll(boolean original) {
         int rows = PlanketConfig.getInstance().creativeRows;
+
         return this.items.size() > rows * 9;
+    }
+
+    @ModifyConstant(
+            method = "scrollTo",
+            constant = @Constant(intValue = 5)
+    )
+    private int planket$modifyVisibleRows(int original) {
+        return PlanketConfig.getInstance().creativeRows;
     }
 }
