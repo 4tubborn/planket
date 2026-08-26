@@ -16,8 +16,10 @@ public class PlanketConfig {
     private static PlanketConfig INSTANCE;
 
     // 默认不启用 Inventory 标签页（即隐藏它）
+    //为了适配可变的行数，inventory实际上已经不可用了
     public boolean enableInventoryTab = false;
     public int creativeRows = 6;
+    public boolean enableScrollerMemory = true;
 
     public static PlanketConfig getInstance() {
         if (INSTANCE == null) {

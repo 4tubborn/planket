@@ -142,9 +142,7 @@ public class KeyHandler {
         return false;
     }
 
-    /**
-     * 切换标签页
-     */
+    // 切换标签页
     private static void switchToTab(CreativeModeInventoryScreen screen, CreativeModeTab targetTab) {
 
         if (targetTab == null) {

@@ -37,6 +37,8 @@ import stubborn.planket.client.util.ScreenInterface;
 import stubborn.planket.client.config.PlanketConfig;
 import static stubborn.planket.client.PlanketClient.LOGGER;
 
+import static net.minecraft.world.item.CreativeModeTabs.INVENTORY_BACKGROUND;
+
 import java.util.List;
 
 //增加inventory，重构左侧item行。
@@ -123,10 +125,6 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
         return new CreativeModeInventoryScreen.CustomCreativeSlot(CreativeInventoryScreenMixin.CONTAINER, index, x, y);
     }
 
-    @Unique
-    private static final Identifier INVENTORY_TEXTURE =
-            Identifier.withDefaultNamespace("textures/gui/container/creative_inventory/tab_inventory.png");
-
     @Redirect(method = "renderBg(Lnet/minecraft/client/gui/GuiGraphics;FII)V",
             at = @At(value = "INVOKE",
                     target = "Lnet/minecraft/client/gui/GuiGraphics;blit(Lcom/mojang/blaze3d/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIFFIIII)V"))
@@ -191,7 +189,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 
         guiGraphics.blit(
                 RenderPipelines.GUI_TEXTURED,
-                INVENTORY_TEXTURE,
+                INVENTORY_BACKGROUND,
                 x, y,
                 0.0F, 0.0F,
                 256, 256,

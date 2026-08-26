@@ -8,6 +8,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import stubborn.planket.client.config.PlanketConfig;
 import stubborn.planket.client.handler.CreativeScrollManager;
 
 @Mixin(CreativeModeInventoryScreen.class)
@@ -46,12 +47,12 @@ public abstract class CreativeScrollMixin {
             CreativeModeTab tab,
             CallbackInfo ci
     ) {
-        if(planket$initializing) {return;}
-        CreativeScrollManager.set(
-                selectedTab,
-                this.scrollOffs
-        );
+        if(planket$initializing) return;
+
         CreativeScrollManager.updateLastTab(selectedTab);
+
+        if(!PlanketConfig.getInstance().enableScrollerMemory) return;
+        CreativeScrollManager.set(selectedTab, this.scrollOffs);
     }
 
     @Inject(
@@ -62,6 +63,7 @@ public abstract class CreativeScrollMixin {
             CreativeModeTab tab,
             CallbackInfo ci
     ) {
+        if(!PlanketConfig.getInstance().enableScrollerMemory) return;
         float scroll = CreativeScrollManager.get(tab);
 
         this.scrollOffs = scroll;
@@ -75,9 +77,7 @@ public abstract class CreativeScrollMixin {
             at = @At("HEAD")
     )
     private void planket$saveScrollOnClose(CallbackInfo ci) {
-        CreativeScrollManager.set(
-                selectedTab,
-                this.scrollOffs
-        );
+        if(!PlanketConfig.getInstance().enableScrollerMemory) return;
+        CreativeScrollManager.set(selectedTab, this.scrollOffs);
     }
 }

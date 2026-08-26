@@ -8,6 +8,6 @@ import stubborn.planket.client.screen.PlanketConfigScreen;
 public class ModMenuCompat implements ModMenuApi {
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
-        return (ConfigScreenFactory<Screen>) parent -> new PlanketConfigScreen(parent);
+        return (ConfigScreenFactory<Screen>) PlanketConfigScreen::new;
     }
 }

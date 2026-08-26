@@ -24,3 +24,5 @@ accessible field net/minecraft/client/gui/screens/inventory/CreativeModeInventor
 accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen selectTab (Lnet/minecraft/world/item/CreativeModeTab;)V
 
 accessible field net/minecraft/client/gui/screens/inventory/AbstractContainerScreen menu Lnet/minecraft/world/inventory/AbstractContainerMenu;
+
+accessible field net/minecraft/world/item/CreativeModeTabs INVENTORY_BACKGROUND Lnet/minecraft/resources/Identifier;

@@ -2,6 +2,7 @@ package stubborn.planket.client.screen;
 
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
@@ -77,6 +78,35 @@ public class PlanketConfigScreen extends Screen {
                 super.onRelease(event);
             }
         });
+
+        // Scroll 记忆开关
+        this.addRenderableWidget(Button.builder(
+                        Component.translatable("options.planket.enable_scroller_memory")
+                                .append(": ")
+                                .append(config.enableScrollerMemory
+                                        ? Component.translatable("options.on")
+                                        : Component.translatable("options.off")),
+                        btn -> {
+                            config.enableScrollerMemory = !config.enableScrollerMemory;
+                            config.save();
+
+                            btn.setMessage(
+                                    Component.translatable("options.planket.enable_scroller_memory")
+                                            .append(": ")
+                                            .append(config.enableScrollerMemory
+                                                    ? Component.translatable("options.on")
+                                                    : Component.translatable("options.off"))
+                            );
+
+                            btn.setTooltip(
+                                    Tooltip.create(
+                                            Component.translatable("options.planket.enable_scroller_memory.tooltip")
+                                    ));
+                        })
+                .pos(startX, startY + vertPadding * 2)
+                .size(btnWidth, btnHeight)
+                .build()
+        );
         //“完成”按钮
         this.addRenderableWidget(Button.builder(
                         Component.translatable("gui.done"),
