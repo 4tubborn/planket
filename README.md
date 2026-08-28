@@ -6,7 +6,7 @@ Powered by Gemini, DeepSeek & ChatGPT.
 
 * **Accessible Inventory** : Keeps the player's inventory permanently visible on the right side of the creative inventory screen, making it easier to drag items from tabs into your inventory without switching back and forth.
 
-* **Shortcut Keys** : `ctrl+tab` & `ctrl+shift+tab` switch tabs, `ctrl+l` switches to last selected tab , `ctrl+1~9` select the 1st to 8th or the last tab, `ctrl+f` switches to search tab.
+* **Shortcut Keys** : `ctrl+tab` & `ctrl+shift+tab` switch tabs. `ctrl+l` switches to last selected tab. `ctrl+1~9` select the 1st to 8th or the last tab. `ctrl+f` switches to search tab. `ctrl+↑/↓` switch pages.
 
 ## Notes
 
