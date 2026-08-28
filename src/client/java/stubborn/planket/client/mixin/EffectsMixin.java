@@ -10,6 +10,7 @@ import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.EffectsInInventory;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffectUtil;
 import org.spongepowered.asm.mixin.*;
@@ -18,7 +19,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import stubborn.planket.client.util.ScreenInterface;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 
 //修改effect的渲染
 @Mixin(EffectsInInventory.class)
@@ -54,125 +57,245 @@ public class EffectsMixin {
     }
 
     @Inject(method = "render", at = @At("HEAD"), cancellable = true)
-    public void render(GuiGraphics guiGraphics, int i, int j, CallbackInfo ci) {
-        Collection<MobEffectInstance> collection = this.minecraft.player.getActiveEffects();
-        if (collection.isEmpty()) return;
+    private void stubborn$render(GuiGraphics guiGraphics, int mouseX, int mouseY, CallbackInfo ci) {
+        if (this.minecraft.player == null) return;
 
-        if (!(this.screen instanceof CreativeModeInventoryScreen) || !(this.screen instanceof ScreenInterface Pl)) {
+        Collection<MobEffectInstance> effects = this.minecraft.player.getActiveEffects();
+        if (effects.isEmpty()) return;
+
+        if (!(this.screen instanceof CreativeModeInventoryScreen)
+                || !(this.screen instanceof ScreenInterface planketScreen)) {
             return;
         }
 
-        // 获取起始坐标（右侧背包下方）
         int startX = this.screen.leftPos + this.screen.imageWidth + 2;
-        int startY = Pl.planket$getInventoryTopPos() + Pl.planket$getInventoryHeight() + 3;
+        int startY = planketScreen.planket$getInventoryTopPos()
+                + planketScreen.planket$getInventoryHeight() + 3;
 
-        // 计算可用总宽度（到屏幕右边缘的距离）
-        int maxWidth = this.screen.width - startX;
-        if (maxWidth < 32) return; // 极小空间不渲染
+        int availableWidth = this.screen.width - startX;
+        int availableHeight = this.screen.height - startY - 5;
 
-        this.stubborn$renderHorizontalEffects(guiGraphics, collection, startX, startY, i, j, maxWidth);
+        if (availableWidth < 32 || availableHeight < 32) return;
+
+        this.stubborn$renderHorizontalEffects(
+                guiGraphics, effects, startX, startY, mouseX, mouseY,
+                availableWidth, availableHeight);
 
         ci.cancel();
     }
 
     @Unique
-    private void stubborn$renderHorizontalEffects(GuiGraphics guiGraphics, Collection<MobEffectInstance> collection, int startX, int startY, int mouseX, int mouseY, int totalWidth) {
-        var sortedEffects = Ordering.natural().sortedCopy(collection);
+    private void stubborn$renderHorizontalEffects(
+            GuiGraphics guiGraphics, Collection<MobEffectInstance> effects,
+            int startX, int startY, int mouseX, int mouseY,
+            int availableWidth, int availableHeight
+    ) {
+        List<MobEffectInstance> sortedEffects = Ordering.natural().sortedCopy(effects);
         Font font = this.screen.getFont();
-        int GAP = 2;
-        int HEIGHT_STEP = 33;
 
-        // 假设可用的最大高度，可以根据你的 Planket 底部边缘动态计算
-        // 比如：this.screen.height - startY - 5
-        int availableHeight = this.screen.height - startY - 5;
+        final int gap = 2;
+        final int effectHeight = 32;
+        final int rowStep = effectHeight + gap;
 
-        // --- 第一步：预计算动态宽度并评估所需高度 ---
-        int totalExpectedWidth = 0;
-        int[] cachedWidths = new int[sortedEffects.size()];
-        int estimatedRows = 1;
-        int currentLineOccupied = 0;
+        int[] fullWidths = new int[sortedEffects.size()];
 
         for (int i = 0; i < sortedEffects.size(); i++) {
-            MobEffectInstance effect = sortedEffects.get(i);
-            int textW = 0;
-            if (this.getEffectName(effect) != null) {
-                textW = Math.max(font.width(this.getEffectName(effect)),
-                        font.width(MobEffectUtil.formatDuration(effect, 1.0F, this.minecraft.level.tickRateManager().tickrate())));
-            }
-            int w = Math.min(120, 32 + textW + 7);
-            cachedWidths[i] = w;
-            totalExpectedWidth += w + GAP;
+            fullWidths[i] = this.stubborn$getFullEffectWidth(sortedEffects.get(i), font);
+        }
 
-            // 模拟换行逻辑来估算总高度
-            if (currentLineOccupied + w > totalWidth) {
-                estimatedRows++;
-                currentLineOccupied = w + GAP;
+        int fullRows = this.stubborn$calculateRows(fullWidths, availableWidth, gap);
+        int compactRows = this.stubborn$calculateFixedRows(
+                sortedEffects.size(), 32, availableWidth, gap
+        );
+
+        int fullHeight = fullRows * effectHeight + Math.max(0, fullRows - 1) * gap;
+        int compactHeight = compactRows * effectHeight + Math.max(0, compactRows - 1) * gap;
+
+        if (fullHeight <= availableHeight) {
+            this.stubborn$renderWrappedEffects(
+                    guiGraphics, sortedEffects, fullWidths,
+                    startX, startY, mouseX, mouseY,
+                    availableWidth, gap, rowStep
+            );
+        } else if (compactHeight <= availableHeight) {
+            this.stubborn$renderCompactEffects(
+                    guiGraphics, sortedEffects,
+                    startX, startY, mouseX, mouseY,
+                    availableWidth, gap, rowStep
+            );
+        } else {
+            this.stubborn$renderCompressedEffects(
+                    guiGraphics, sortedEffects,
+                    startX, startY, mouseX, mouseY,
+                    availableWidth
+            );
+        }
+    }
+
+    @Unique
+    private int stubborn$getFullEffectWidth(MobEffectInstance effect, Font font) {
+        Component name = this.getEffectName(effect);
+        Component duration = MobEffectUtil.formatDuration(
+                effect, 1.0F, this.minecraft.level.tickRateManager().tickrate()
+        );
+
+        return Math.min(
+                120,
+                32 + Math.max(font.width(name), font.width(duration)) + 7
+        );
+    }
+
+    @Unique
+    private int stubborn$calculateRows(int[] widths, int availableWidth, int gap) {
+        if (widths.length == 0) return 0;
+
+        int rows = 1;
+        int occupied = 0;
+
+        for (int width : widths) {
+            if (occupied == 0) {
+                occupied = width;
+            } else if (occupied + gap + width > availableWidth) {
+                rows++;
+                occupied = width;
             } else {
-                currentLineOccupied += w + GAP;
+                occupied += gap + width;
             }
         }
 
-        // --- 第二步：核心决策逻辑 ---
-        boolean isCompact = totalExpectedWidth > totalWidth;
-        boolean forceSingleRow = (estimatedRows * HEIGHT_STEP) > availableHeight;
+        return rows;
+    }
 
-        int currentX = startX;
-        int currentY = startY;
+    @Unique
+    private int stubborn$calculateFixedRows(int count, int width, int availableWidth, int gap) {
+        if (count == 0) return 0;
 
-        // 如果高度不够，哪怕本该换行，我们也强行挤在一行（类似原版 logic）
-        if (forceSingleRow) {
-            // 计算极致紧凑下的间距（可能会重叠图标，类似原版 5 个以上效果的处理）
-            int n = 33;
-            if (sortedEffects.size() > 1) {
-                // totalWidth 减去最后一个图标的宽度(32)，平摊剩下的空间
-                n = (totalWidth - 32) / (sortedEffects.size() - 1);
-                n = Math.min(n, 33); // 最大间距不超过原版宽度
+        int rows = 1;
+        int occupied = 0;
+
+        for (int i = 0; i < count; i++) {
+            if (occupied == 0) {
+                occupied = width;
+            } else if (occupied + gap + width > availableWidth) {
+                rows++;
+                occupied = width;
+            } else {
+                occupied += gap + width;
             }
-
-            Iterable<MobEffectInstance> iterable = Ordering.natural().sortedCopy(collection);
-
-            // 极致紧凑渲染循环
-            for (MobEffectInstance effect : iterable) {
-                //MobEffectInstance effect = sortedEffects.get(i);
-                //int x = startX + i * n;
-                // 极致紧凑模式 m 传 32（只画图标）
-                Component time = MobEffectUtil.formatDuration(effect, 1.0F, this.minecraft.level.tickRateManager().tickrate());
-
-                int actualWidth = this.renderBackground(guiGraphics, font, this.getEffectName(effect),
-                        time, currentX, startY, effect.isAmbient(), 32);
-
-                this.renderText(guiGraphics, this.getEffectName(effect), time,
-                        font, currentX, startY, actualWidth, HEIGHT_STEP, mouseX, mouseY);
-
-                guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, Gui.getMobEffectSprite(effect.getEffect()), currentX + 7, startY + 7, 18, 18);
-
-                currentX += n;
-            }
-            return; // 处理完极致紧凑模式直接返回
         }
 
-        // --- 第三步：正常的换行排列渲染（高度足够时） ---
-        int m = isCompact ? 32 : 120;
+        return rows;
+    }
 
-        for (int i = 0; i < sortedEffects.size(); i++) {
-            MobEffectInstance effect = sortedEffects.get(i);
-            int effectWidth = isCompact ? 32 : cachedWidths[i];
+    @Unique
+    private void stubborn$renderWrappedEffects(
+            GuiGraphics guiGraphics, List<MobEffectInstance> effects, int[] widths,
+            int startX, int startY, int mouseX, int mouseY,
+            int availableWidth, int gap, int rowStep
+    ) {
+        Font font = this.screen.getFont();
+        int x = startX;
+        int y = startY;
 
-            if (currentX + effectWidth > startX + totalWidth) {
-                currentX = startX;
-                currentY += HEIGHT_STEP + GAP;
+        for (int i = 0; i < effects.size(); i++) {
+            int width = widths[i];
+
+            if (x != startX && x + width > startX + availableWidth) {
+                x = startX;
+                y += rowStep;
             }
 
-            Component time = MobEffectUtil.formatDuration(effect, 1.0F, this.minecraft.level.tickRateManager().tickrate());;
+            int actualWidth = this.stubborn$renderSingleEffect(
+                    guiGraphics, effects.get(i), font,
+                    x, y, width, rowStep,
+                    mouseX, mouseY
+            );
 
-            int actualWidth = this.renderBackground(guiGraphics, font, this.getEffectName(effect),
-                    time, currentX, currentY, effect.isAmbient(), m);
-
-            this.renderText(guiGraphics, this.getEffectName(effect), time,
-                    font, currentX, currentY, actualWidth, HEIGHT_STEP, mouseX, mouseY);
-
-            guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, Gui.getMobEffectSprite(effect.getEffect()), currentX + 7, currentY + 7, 18, 18);
-            currentX += actualWidth + GAP;
+            x += actualWidth + gap;
         }
+    }
+
+    @Unique
+    private void stubborn$renderCompactEffects(
+            GuiGraphics guiGraphics, List<MobEffectInstance> effects,
+            int startX, int startY, int mouseX, int mouseY,
+            int availableWidth, int gap, int rowStep
+    ) {
+        Font font = this.screen.getFont();
+        int x = startX;
+        int y = startY;
+
+        for (MobEffectInstance effect : effects) {
+            if (x != startX && x + 32 > startX + availableWidth) {
+                x = startX;
+                y += rowStep;
+            }
+
+            this.stubborn$renderSingleEffect(
+                    guiGraphics, effect, font,
+                    x, y, 32, rowStep,
+                    mouseX, mouseY
+            );
+
+            x += 32 + gap;
+        }
+    }
+
+    @Unique
+    private void stubborn$renderCompressedEffects(
+            GuiGraphics guiGraphics, List<MobEffectInstance> effects,
+            int startX, int startY, int mouseX, int mouseY,
+            int availableWidth
+    ) {
+        Font font = this.screen.getFont();
+        int count = effects.size();
+
+        int step = 33;
+        if (count > 1) {
+            step = Mth.clamp((availableWidth - 32) / (count - 1), 1, 33);
+        }
+
+        int x = startX;
+
+        for (MobEffectInstance effect : effects) {
+            this.stubborn$renderSingleEffect(
+                    guiGraphics, effect, font,
+                    x, startY, 32, 33,
+                    mouseX, mouseY
+            );
+
+            x += step;
+        }
+    }
+
+    @Unique
+    private int stubborn$renderSingleEffect(
+            GuiGraphics guiGraphics, MobEffectInstance effect, Font font,
+            int x, int y, int maxWidth, int verticalSpacing,
+            int mouseX, int mouseY
+    ) {
+        Component name = this.getEffectName(effect);
+        Component duration = MobEffectUtil.formatDuration(
+                effect, 1.0F, this.minecraft.level.tickRateManager().tickrate()
+        );
+
+        int actualWidth = this.renderBackground(
+                guiGraphics, font, name, duration,
+                x, y, effect.isAmbient(), maxWidth
+        );
+
+        this.renderText(
+                guiGraphics, name, duration, font,
+                x, y, actualWidth, verticalSpacing,
+                mouseX, mouseY
+        );
+
+        guiGraphics.blitSprite(
+                RenderPipelines.GUI_TEXTURED,
+                Gui.getMobEffectSprite(effect.getEffect()),
+                x + 7, y + 7, 18, 18
+        );
+
+        return actualWidth;
     }
 }

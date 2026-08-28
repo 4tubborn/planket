@@ -1,9 +1,11 @@
 {
-"modmenu.nameTranslation.planket": "Planket",
-"modmenu.descriptionTranslation.planket": "更多資訊請參閱 Modrinth。",
-"modmenu.summaryTranslation.planket": "修改創造模式物品欄的樣式。",
-"options.planket.enable_inventory_tab": "啟用生存模式物品欄分頁",
-"options.planket.creative_rows": "分頁內物品列數",
-"options.planket.enable_scroller_memory": "捲軸位置記憶",
-"options.planket.enable_scroller_memory.tooltip": "切換分頁或關閉畫面時記住捲軸的位置"
+  "modmenu.nameTranslation.planket": "Planket",
+  "modmenu.descriptionTranslation.planket": "更多資訊請參閱 Modrinth。",
+  "modmenu.summaryTranslation.planket": "修改創造模式物品欄的樣式。",
+  "options.planket.title": "Planket 設定",
+  "options.planket.category.general": "通用",
+  "options.planket.enable_inventory_tab": "啟用生存模式物品欄分頁",
+  "options.planket.creative_rows": "分頁內物品列數",
+  "options.planket.enable_scroll_memory": "捲軸位置記憶",
+  "options.planket.enable_scroll_memory.tooltip": "切換分頁或關閉畫面時記住捲軸的位置"
 }

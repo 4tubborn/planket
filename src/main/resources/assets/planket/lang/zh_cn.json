@@ -2,8 +2,10 @@
   "modmenu.nameTranslation.planket": "Planket",
   "modmenu.descriptionTranslation.planket": "更多信息请在Modrinth上查看。",
   "modmenu.summaryTranslation.planket": "修改了创造物品栏的样式。",
+  "options.planket.title": "Planket 设置",
+  "options.planket.category.general": "通用",
   "options.planket.enable_inventory_tab": "启用生存模式物品栏标签页",
   "options.planket.creative_rows": "标签页内物品行数",
-  "options.planket.enable_scroller_memory": "滚动条位置记忆",
-  "options.planket.enable_scroller_memory.tooltip": "在切换标签页或关闭屏幕时记住滚动条的位置"
+  "options.planket.enable_scroll_memory": "滚动条位置记忆",
+  "options.planket.enable_scroll_memory.tooltip": "在切换标签页或关闭屏幕时记住滚动条的位置"
 }

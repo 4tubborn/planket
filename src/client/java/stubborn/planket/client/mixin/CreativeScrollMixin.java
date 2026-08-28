@@ -51,7 +51,7 @@ public abstract class CreativeScrollMixin {
 
         CreativeScrollManager.updateLastTab(selectedTab);
 
-        if(!PlanketConfig.getInstance().enableScrollerMemory) return;
+        if(!PlanketConfig.getInstance().enableScrollMemory) return;
         CreativeScrollManager.set(selectedTab, this.scrollOffs);
     }
 
@@ -63,7 +63,7 @@ public abstract class CreativeScrollMixin {
             CreativeModeTab tab,
             CallbackInfo ci
     ) {
-        if(!PlanketConfig.getInstance().enableScrollerMemory) return;
+        if(!PlanketConfig.getInstance().enableScrollMemory) return;
         float scroll = CreativeScrollManager.get(tab);
 
         this.scrollOffs = scroll;
@@ -77,7 +77,7 @@ public abstract class CreativeScrollMixin {
             at = @At("HEAD")
     )
     private void planket$saveScrollOnClose(CallbackInfo ci) {
-        if(!PlanketConfig.getInstance().enableScrollerMemory) return;
+        if(!PlanketConfig.getInstance().enableScrollMemory) return;
         CreativeScrollManager.set(selectedTab, this.scrollOffs);
     }
 }

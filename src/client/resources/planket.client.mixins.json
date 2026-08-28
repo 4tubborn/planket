@@ -9,6 +9,7 @@
     "CreativeTabMixin",
     "EffectsMixin",
     "IngredientListOverlayMixin",
+    "ItemGroupButtonWidgetAccessor",
     "ItemPickerMenuMixin"
   ],
   "injectors": {

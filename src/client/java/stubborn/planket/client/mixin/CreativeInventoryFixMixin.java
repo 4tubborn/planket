@@ -1,5 +1,7 @@
 package stubborn.planket.client.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -42,13 +44,14 @@ public abstract class CreativeInventoryFixMixin extends AbstractContainerScreen 
     }
 
     //修复原版滑块鼠标释放的bug
-    @Inject(method = "mouseReleased", at = @At("HEAD"), cancellable = true)
-    private void fixScrollDragTabSwitch(MouseButtonEvent event, CallbackInfoReturnable<Boolean> cir) {
-        // 只处理左键，且当正在拖动滑块时
+    @WrapMethod(method = "mouseReleased")
+    private boolean fixScrollDragTabSwitch(MouseButtonEvent event, Operation<Boolean> original) {
         if (event.button() == 0 && this.scrolling) {
-            this.scrolling = false;           // 重置拖动状态
-            cir.setReturnValue(true);         // 直接消费事件，不再触发标签检测
+            this.scrolling = false;
+            return true;
         }
+
+        return original.call(event);
     }
 
     /*@Redirect(method = "render",

@@ -1,15 +1,19 @@
 package stubborn.planket.client.mixin;
 
-import com.google.common.collect.ImmutableList;
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import net.fabricmc.fabric.impl.client.itemgroup.FabricCreativeGuiComponents;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -23,7 +27,6 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -31,71 +34,78 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import stubborn.planket.client.handler.CreativeScrollManager;
+import stubborn.planket.client.gui.InventoryPanel;
 import stubborn.planket.client.handler.KeyHandler;
 import stubborn.planket.client.util.ScreenInterface;
 import stubborn.planket.client.config.PlanketConfig;
 import static stubborn.planket.client.PlanketClient.LOGGER;
 
-import static net.minecraft.world.item.CreativeModeTabs.INVENTORY_BACKGROUND;
-
-import java.util.List;
 
 //增加inventory，重构左侧item行。
 @Mixin(CreativeModeInventoryScreen.class)
 public abstract class CreativeInventoryScreenMixin extends AbstractContainerScreen implements ScreenInterface {
 
-    @Shadow private EditBox searchBox; // 对应源码第 17 行[cite: 3]
+    @Shadow private EditBox searchBox; // 搜索框
     @Shadow public static CreativeModeTab selectedTab;
 
     @Shadow protected abstract boolean checkTabClicked(CreativeModeTab tab, double d, double e);
     @Shadow private boolean hasClickedOutside;
-    @Shadow private @Nullable List<Slot> originalSlots;
     @Shadow private @Nullable Slot destroyItemSlot;
     @Shadow public static final SimpleContainer CONTAINER = new SimpleContainer(45);
     @Shadow private boolean scrolling;
 
-    @Shadow protected abstract void selectTab(CreativeModeTab creativeModeTab);
     @Shadow private float scrollOffs;
 
     @Unique
-    public int actualImageWidth = this.imageWidth * 2 ;
-    @Unique
     public int originalTopPos;
+
     @Unique
-    public int inventoryWidth = 195;
+    private @Nullable InventoryPanel planket$inventoryPanel;
+
     @Unique
-    public int inventoryHeight = 136;
+    private boolean planket$inventoryQuickCrafting;
+
+    @Unique
+    private int planket$quickCraftStartData;
 
     public CreativeInventoryScreenMixin(AbstractContainerMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
     }
 
-    @Inject(method = "hasClickedOutside", at = @At("HEAD"), cancellable = true)
-    private void includeRightPanelInBounds(double d, double e, int i, int j, CallbackInfoReturnable<Boolean> cir) {
-        boolean bl = d < (double)i || e < (double)j || d >= (double)(i + 2 * this.imageWidth) || e >= (double)(j + this.imageHeight);
-        this.hasClickedOutside = bl && !this.checkTabClicked(selectedTab, d, e);
-        cir.setReturnValue(this.hasClickedOutside);
+    @ModifyReturnValue(method = "hasClickedOutside", at = @At("RETURN"))
+    private boolean includeRightPanelInBounds(boolean original, double mouseX, double mouseY, int left, int top) {
+        int inventoryX = left + this.imageWidth;
+        int inventoryY = this.originalTopPos;
+
+        boolean insideInventoryPanel =
+                mouseX >= inventoryX
+                        && mouseX < inventoryX + InventoryPanel.WIDTH
+                        && mouseY >= inventoryY
+                        && mouseY < inventoryY + InventoryPanel.HEIGHT;
+
+        boolean result = original && !insideInventoryPanel;
+
+        this.hasClickedOutside = result;
+        return result;
     }
 
-    // 已移除反射相关的 Class、Constructor 和 Field 变量[cite: 3]
-
     static {
-        // 移除了反射初始化逻辑，直接配置容器[cite: 3]
-        NonNullList<ItemStack> newList = NonNullList.createWithCapacity(108);
-        for (int i = 0; i < 108; i++) newList.add(ItemStack.EMPTY);
-        // 注意：由于 SimpleContainer 的 items 字段通常是私有的，
-        // 建议在 accesswidener 中一并开放该字段的访问权限[cite: 3]
+        NonNullList<ItemStack> newList = NonNullList.createWithCapacity(PlanketConfig.slotMaxCapacity);
+        for (int i = 0; i < PlanketConfig.slotMaxCapacity; i++) newList.add(ItemStack.EMPTY);
         CONTAINER.items = newList;
     }
 
-    @Unique
-    private int getSlotWrapperIndex(Slot slot) {
-        // 使用 instanceof 替代反射，Loom 会自动处理混淆[cite: 3]
-        if (slot instanceof CreativeModeInventoryScreen.SlotWrapper wrapper) {
-            return wrapper.target.index;
+    @Inject(method = "init", at = @At("HEAD"))
+    private void planket$prepareInventoryPanel(CallbackInfo ci) {
+        Player player = this.minecraft.player;
+        if (player != null && this.planket$inventoryPanel == null) {
+            this.planket$inventoryPanel = new InventoryPanel(
+                    this.minecraft,
+                    (CreativeModeInventoryScreen.ItemPickerMenu)this.menu,
+                    player,
+                    CONTAINER
+            );
         }
-        return -1;
     }
 
     @Inject(method = "init", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen;selectTab(Lnet/minecraft/world/item/CreativeModeTab;)V", shift = At.Shift.BEFORE))
@@ -108,35 +118,47 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
         // 左移逻辑
         int offset = 100;
         this.leftPos -= offset;
-        if (this.searchBox != null) {
-            this.searchBox.setX(this.leftPos + 82);
+
+        Player player = this.minecraft.player;
+        if (player != null) {
+            rebuildLeftPanel(player);
         }
+
         //搜索框复位
         if (this.searchBox != null) {
             this.searchBox.setX(this.leftPos + 82);
             // 完美对齐原版：当前真正居中后的 topPos + 6
             this.searchBox.setY(this.topPos + 6);
         }
+
+        if (this.planket$inventoryPanel != null) {
+            this.planket$inventoryPanel.init(this.imageWidth, this.originalTopPos - this.topPos);
+            this.destroyItemSlot = this.planket$inventoryPanel.getDestroyItemSlot();
+        }
+
+        this.planket$updateFabricPageButtons();
+    }
+
+    @Inject(method = "removed", at = @At(value = "HEAD"))
+    private void planket$removePanel(CallbackInfo ci) {
+        planket$removeInventoryPanel();
     }
 
     @Unique
     private static Slot createCustomCreativeSlot(int index, int x, int y) {
-        // 同样直接 new，前提是已在 accesswidener 中开放构造函数[cite: 3]
+        // 同样直接 new
         return new CreativeModeInventoryScreen.CustomCreativeSlot(CreativeInventoryScreenMixin.CONTAINER, index, x, y);
     }
 
-    @Redirect(method = "renderBg(Lnet/minecraft/client/gui/GuiGraphics;FII)V",
-            at = @At(value = "INVOKE",
-                    target = "Lnet/minecraft/client/gui/GuiGraphics;blit(Lcom/mojang/blaze3d/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIFFIIII)V"))
-    private void redirectLeftBackground(GuiGraphics guiGraphics, RenderPipeline pipeline, Identifier texture,
-                                        int x, int y, float u, float v, int width, int height, int texWidth, int texHeight) {
-        int rows = PlanketConfig.getInstance().creativeRows;
-        if (rows <= 5) {
-            // 保留原版完整纹理
-            guiGraphics.blit(pipeline, texture, x, y, u, v, width, height, texWidth, texHeight);
-        } else {
-            drawDynamicLeftBg(guiGraphics, pipeline, texture, x, y);
+    @WrapWithCondition(method = "renderBg(Lnet/minecraft/client/gui/GuiGraphics;FII)V",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiGraphics;blit(Lcom/mojang/blaze3d/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIFFIIII)V"))
+    private boolean wrapLeftBackground(GuiGraphics guiGraphics, RenderPipeline pipeline, Identifier texture, int x, int y, float u, float v, int width, int height, int texWidth, int texHeight) {
+        if (PlanketConfig.getInstance().creativeRows <= 5) {
+            return true; // 执行原版 blit
         }
+
+        drawDynamicLeftBg(guiGraphics, pipeline, texture, x, y);
+        return false; // 阻止原版 blit
     }
 
     @Unique
@@ -181,117 +203,17 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 
     @Inject(method = "renderBg", at = @At("TAIL"))
     private void renderPermanentInventoryBackground(GuiGraphics guiGraphics, float f, int i, int j, CallbackInfo ci) {
-
-        // 使用源码第 428 行相同的参数结构
-        // 参数: Pipeline, Texture, x, y, u, v, width, height, textureWidth, textureHeight
-        int x = this.leftPos + this.imageWidth;
-        int y = this.originalTopPos;
-
-        guiGraphics.blit(
-                RenderPipelines.GUI_TEXTURED,
-                INVENTORY_BACKGROUND,
-                x, y,
-                0.0F, 0.0F,
-                256, 256,
-                256, 256
-        );
-
-        if (this.minecraft.player != null) {
-            InventoryScreen.renderEntityInInventoryFollowsMouse(guiGraphics, x + 73 , y + 6, x + 105, y + 49, 20, 0.0625F, (float)i, (float)j, this.minecraft.player);
+        if (this.planket$inventoryPanel != null) {
+            this.planket$inventoryPanel.render(
+                    guiGraphics,
+                    this.leftPos + this.imageWidth,
+                    this.originalTopPos,
+                    i,
+                    j
+            );
         }
     }
 
-
-    /**
-     * 映射常驻 Slot 到右侧面板，每次切换标签页都重新new，因为原版会在切换页面时clear
-     */
-    @Inject(method = "selectTab", at = @At("TAIL"))
-    private void addPermanentSlots(CreativeModeTab tab, CallbackInfo ci) {
-        Player player = this.minecraft.player;
-        if (player == null) return; // 移除 slotWrapperConstructor 的 null 检查[cite: 3]
-
-        // ★ 清除上一次残留的右侧面板槽位（包括旧的垃圾桶）
-        this.menu.slots.removeIf(slot -> slot.x >= this.imageWidth);
-        // 同时把销毁槽引用置空，避免指向被移除的对象
-        this.destroyItemSlot = null;
-
-        rebuildLeftPanel(player);
-
-        // 偏移起点：主面板宽度 (195)
-        int xOffset = this.imageWidth;
-        int deltaY = this.originalTopPos - this.topPos;
-
-        try{
-            AbstractContainerMenu abstractContainerMenu = this.minecraft.player.inventoryMenu;
-            if (this.originalSlots == null) {
-                this.originalSlots = ImmutableList.copyOf(((CreativeModeInventoryScreen.ItemPickerMenu)this.menu).slots);
-            }
-
-            //原版的浆糊逻辑
-            for(int i = 0; i < abstractContainerMenu.slots.size(); ++i) {int n;int j;
-                if (i >= 5 && i < 9) {
-                    int k = i - 5;
-                    int l = k / 2;
-                    int m = k % 2;
-                    n = 54 + l * 54;
-                    j = 6 + m * 27;
-                } else if (i < 5) {
-                    n = -2000;
-                    j = -2000;
-                } else if (i == 45) {
-                    n = 35;
-                    j = 20;
-                } else {
-                    int k = i - 9;
-                    int l = k % 9;
-                    int m = k / 9;
-                    n = 9 + l * 18;
-                    if (i >= 36) {
-                        j = 112;
-                    } else {
-                        j = 54 + m * 18;
-                    }
-                }
-
-                // 直接实例化 SlotWrapper
-                Slot slot = new CreativeModeInventoryScreen.SlotWrapper(abstractContainerMenu.slots.get(i), i, n + xOffset, j + deltaY);
-
-
-                this.menu.addSlot(slot);
-            }
-            // 在 selectTab 的循环之后
-            this.destroyItemSlot = new Slot(CONTAINER, 0, 173 + xOffset, 112 + deltaY) {
-                @Override
-                public void set(@NonNull ItemStack stack) {
-                    // 核心：强制设为空，实现销毁效果
-                    super.set(ItemStack.EMPTY);
-                }
-
-                @Override
-                public @NonNull ItemStack getItem() {
-                    // 渲染隔离：强制返回空。即便 ItemPickerMenu 想给你填东西，渲染器在这里也拿不到数据
-                    return ItemStack.EMPTY;
-                }
-
-                @Override
-                public boolean mayPickup(@NonNull Player player) {
-                    // 只能进不能出
-                    return false;
-                }
-
-                @Override
-                public boolean isActive() {
-                    // 确保非 INVENTORY 标签页下它也参与交互逻辑
-                    return true;
-                }
-            };
-
-            this.menu.addSlot(this.destroyItemSlot);
-
-        } catch (Exception e){
-            LOGGER.error("Errors when trying to add inventory slots: ", e);
-        }
-    }
 
     @Unique
     private void rebuildLeftPanel(Player player) {
@@ -307,7 +229,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
                             9 + col * 18,
                             18 + row * 18
                     );
-                    this.menu.addSlot(slot);
+                    this.menu.slots.add(slot);
                 } catch (Exception e) {
                     LOGGER.error("Errors when trying to rebuild left tab panel: ", e);
                 }
@@ -319,7 +241,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
             Slot invisibleHotbar = new Slot(player.getInventory(), col, 9 + col * 18, -2000) {
                 @Override public boolean isActive() { return false; }
             };
-            this.menu.addSlot(invisibleHotbar);
+            this.menu.slots.add(invisibleHotbar);
         }
 
         ((CreativeModeInventoryScreen.ItemPickerMenu) this.menu).scrollTo(this.scrollOffs);
@@ -346,21 +268,26 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
         return this.imageHeight - 18 - 6;
     }
 
-    @Inject(
-            method = "mouseDragged",
-            at = @At("HEAD"),
-            cancellable = true
-    )
-    public void mouseDragged(MouseButtonEvent mouseButtonEvent, double d, double e, CallbackInfoReturnable<Boolean> cir) {
-        if (!this.scrolling) return;
+    @WrapMethod(method = "mouseDragged")
+    private boolean planket$mouseDragged(MouseButtonEvent event, double dragX, double dragY, Operation<Boolean> original) {
+        if (!this.scrolling) {
+            return original.call(event, dragX, dragY);
+        }
 
         int top = this.topPos + 18;
-        int visibleHeight = this.imageHeight - 18 - 6;   // 与 insideScrollbar 统一
+        int visibleHeight = this.imageHeight - 18 - 6;
         int bottom = top + visibleHeight;
-        this.scrollOffs = ((float)mouseButtonEvent.y() - (float)top - 7.5F) / ((float)(bottom - top) - 15.0F);
+
+        this.scrollOffs =
+                ((float) event.y() - (float) top - 7.5F)
+                        / ((float) (bottom - top) - 15.0F);
+
         this.scrollOffs = Mth.clamp(this.scrollOffs, 0.0F, 1.0F);
-        ((CreativeModeInventoryScreen.ItemPickerMenu)this.menu).scrollTo(this.scrollOffs);
-        cir.setReturnValue(true);
+
+        ((CreativeModeInventoryScreen.ItemPickerMenu) this.menu)
+                .scrollTo(this.scrollOffs);
+
+        return true;
     }
 
     @ModifyConstant(method = "renderBg", constant = @Constant(intValue = 112, ordinal = 0))
@@ -369,54 +296,107 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
     }
     //滑块结束
     //禁用快捷栏
-    @Redirect(method = "slotClicked", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/inventory/AbstractContainerMenu;getQuickcraftHeader(I)I"))
-    private int disableQuickcraftSync(int header) {
-        return 0; // 条件 AbstractContainerMenu.getQuickcraftHeader(j) == 2 永远为假
+    @ModifyArg(
+            method = "slotClicked",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen$ItemPickerMenu;getSlot(I)Lnet/minecraft/world/inventory/Slot;"
+            ),
+            index = 0
+    )
+    private int planket$redirectHotbarSlotIndex(int slotIndex) {
+        if (slotIndex >= 45 && slotIndex < 54) {
+            return PlanketConfig.getInstance().creativeRows * 9 + (slotIndex - 45);
+        }
+
+        return slotIndex;
     }
+
+    /*@ModifyExpressionValue(method = "slotClicked",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/inventory/AbstractContainerMenu;getQuickcraftHeader(I)I"))
+    private int disableQuickcraftSync(int original) {
+        return 0;
+    }*/
+
     //重新实现背包槽位shift与垃圾桶逻辑
     @Inject(method = "slotClicked", at = @At("HEAD"), cancellable = true)
-    private void onSlotClicked(Slot slot, int slotIndex, int mouseButton, ClickType clickType, CallbackInfo ci) {
-        // 2. 垃圾桶处理
-        if (slot == this.destroyItemSlot && slot.container == CONTAINER) {
-            if (clickType == ClickType.QUICK_MOVE) {
-                for (int k = 0; k < this.minecraft.player.inventoryMenu.slots.size(); k++) {
-                    this.minecraft.player.inventoryMenu.getSlot(k).set(ItemStack.EMPTY);
-                    this.minecraft.gameMode.handleCreativeModeItemAdd(ItemStack.EMPTY, k);
-                }
-            } else {
-                if (this.minecraft.player != null) {
-                    this.minecraft.player.containerMenu.setCarried(ItemStack.EMPTY);
-                }
+    private void planket$onSlotClicked(@Nullable Slot slot, int slotIndex, int mouseButton, ClickType clickType, CallbackInfo ci) {
+        if (this.planket$inventoryPanel == null) {
+            return;
+        }
+
+        if (clickType == ClickType.QUICK_CRAFT) {
+            planket$handleInventoryQuickCraft(slot, mouseButton, ci);
+            return;
+        }
+
+        if (this.planket$inventoryPanel.handleSlotClicked(
+                slot,
+                mouseButton,
+                clickType
+        )) {
+            ci.cancel();
+        }
+    }
+
+    @Unique
+    private void planket$handleInventoryQuickCraft(
+            @Nullable Slot slot,
+            int quickCraftData,
+            CallbackInfo ci
+    ) {
+        Player player = this.minecraft.player;
+        if (player == null) {
+            return;
+        }
+
+        int header = AbstractContainerMenu.getQuickcraftHeader(quickCraftData);
+
+        if (header == 0) {
+            this.planket$inventoryQuickCrafting = false;
+            this.planket$quickCraftStartData = quickCraftData;
+            return;
+        }
+
+        if (header == 1
+                && slot instanceof CreativeModeInventoryScreen.SlotWrapper wrapper
+                && this.planket$inventoryPanel.ownsSlot(slot)) {
+
+            if (!this.planket$inventoryQuickCrafting) {
+                player.inventoryMenu.clicked(
+                        -999,
+                        this.planket$quickCraftStartData,
+                        ClickType.QUICK_CRAFT,
+                        player
+                );
+
+                this.planket$inventoryQuickCrafting = true;
             }
+
+            player.inventoryMenu.clicked(
+                    wrapper.target.index,
+                    quickCraftData,
+                    ClickType.QUICK_CRAFT,
+                    player
+            );
+
             ci.cancel();
             return;
         }
 
-        // 3. 核心：如果是右侧常驻面板的槽位且是 QuickMove
-        if (slot != null && slot.x >= this.imageWidth && clickType == ClickType.QUICK_MOVE) {
-            int realIndex = getSlotWrapperIndex(slot);
-            if (realIndex == -1) {
-                ci.cancel();
-                return;
-            }
+        if (header == 2 && this.planket$inventoryQuickCrafting) {
+            player.inventoryMenu.clicked(
+                    -999,
+                    quickCraftData,
+                    ClickType.QUICK_CRAFT,
+                    player
+            );
 
-            if (this.minecraft.player != null) {
-                this.minecraft.player.inventoryMenu.clicked(realIndex, mouseButton, clickType, this.minecraft.player);
-                this.minecraft.player.inventoryMenu.broadcastChanges();
-            }
-            ci.cancel();
-        }
-    }
+            player.inventoryMenu.broadcastChanges();
+            this.planket$inventoryQuickCrafting = false;
 
-    //同步到生存模式物品栏，但是有点屎山，可能会改
-    @Inject(method = "slotClicked", at = @At("TAIL"))
-    private void onSlotClickedTail(Slot slot, int slotIndex, int mouseButton, ClickType clickType, CallbackInfo ci) {
-        // 只处理右侧常驻面板的有效槽位（排除垃圾桶）
-        if (slot != null && slot.x >= this.imageWidth && slot != this.destroyItemSlot) {
-            int realIndex = getSlotWrapperIndex(slot);
-            if (realIndex != -1 && this.minecraft.player != null) {
-                this.minecraft.player.inventoryMenu.broadcastChanges();
-            }
+            // 不 cancel：
+            // ItemPickerMenu 也需要收到自己的 END。
         }
     }
 
@@ -424,25 +404,61 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
     public int planket$getInventoryTopPos() {
         return this.originalTopPos;
     }
-
     @Override
-    public int planket$getInventoryWidth() {
-        return this.inventoryWidth;
-    }
-
+    public int planket$getInventoryWidth() { return InventoryPanel.WIDTH; }
     @Override
-    public int planket$getInventoryHeight() {
-        return this.inventoryHeight;
-    }
+    public int planket$getInventoryHeight() { return InventoryPanel.HEIGHT; }
 
     // 注入到 keyPressed 方法的首部
-    @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
-    public void keyPressed(@NotNull KeyEvent event, CallbackInfoReturnable<Boolean> cir) {
-        // 转发给独立的快捷键类处理
-        if (KeyHandler.handleKeyPressed((CreativeModeInventoryScreen)(Object)this, event)) {
-            cir.setReturnValue(true); // 如果内部处理了，直接截断事件
+    @WrapMethod(method = "keyPressed")
+    private boolean planket$keyPressed(KeyEvent event, Operation<Boolean> original) {
+        if (KeyHandler.handleKeyPressed((CreativeModeInventoryScreen) (Object) this, event)) {
+            return true;
         }
 
-        cir.setReturnValue(super.keyPressed(event));
+        return original.call(event);
+    }
+
+    @Unique
+    private void planket$removeInventoryPanel() {
+        if (this.planket$inventoryPanel == null) {
+            return;
+        }
+
+        this.planket$inventoryPanel.removed();
+        this.planket$inventoryPanel = null;
+        this.destroyItemSlot = null;
+    }
+
+    /* In net.fabricmc.fabric.mixin.itemgroup.client.CreativeModeInventoryScreenMixin
+    int xpos = leftPos + 171;
+    int ypos = topPos + 4;
+
+    CreativeModeInventoryScreen self = (CreativeModeInventoryScreen) (Object) this;
+    addRenderableWidget(new FabricCreativeGuiComponents.ItemGroupButtonWidget(xpos + 10, ypos, FabricCreativeGuiComponents.Type.NEXT, self));
+    addRenderableWidget(new FabricCreativeGuiComponents.ItemGroupButtonWidget(xpos, ypos, FabricCreativeGuiComponents.Type.PREVIOUS, self));
+    */
+
+    @Unique
+    private void planket$updateFabricPageButtons() {
+        int xPos = this.leftPos + 171;
+        int yPos = this.topPos + 4;
+
+        for (GuiEventListener child : this.children()) {
+            if (!(child instanceof FabricCreativeGuiComponents.ItemGroupButtonWidget button)) {
+                continue;
+            }
+
+            FabricCreativeGuiComponents.Type type =
+                    ((ItemGroupButtonWidgetAccessor) button).planket$getType();
+
+            button.setY(yPos);
+
+            switch (type) {
+                case PREVIOUS -> button.setX(xPos);
+                case NEXT -> button.setX(xPos + 10);
+                default -> LOGGER.error("Invalid button type: {}", type);
+            }
+        }
     }
 }

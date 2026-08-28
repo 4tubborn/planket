@@ -114,28 +114,13 @@ public class KeyHandler {
         }
 
         // Ctrl + ↑ / ↓
-        if (keyCode == GLFW.GLFW_KEY_UP || keyCode == GLFW.GLFW_KEY_DOWN) {
+        if (keyCode == GLFW.GLFW_KEY_UP) {
+            ext.switchToPreviousPage();
+            return true;
+        }
 
-            boolean changed;
-
-            if (keyCode == GLFW.GLFW_KEY_UP) {
-                changed = ext.switchToPreviousPage();
-            } else {
-                changed = ext.switchToNextPage();
-            }
-
-            if (changed) {
-
-                //screen.updateLayout();
-
-                List<CreativeModeTab> newTabs =
-                        ext.getItemGroupsOnPage(ext.getCurrentPage());
-
-                if (!newTabs.isEmpty()) {
-                    switchToTab(screen, newTabs.getFirst());
-                }
-            }
-
+        if (keyCode == GLFW.GLFW_KEY_DOWN) {
+            ext.switchToNextPage();
             return true;
         }
 

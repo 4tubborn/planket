@@ -2,8 +2,10 @@
   "modmenu.nameTranslation.planket": "Planket",
   "modmenu.descriptionTranslation.planket": "Check out details on Modrinth.",
   "modmenu.summaryTranslation.planket": "Modifies creative mode inventory style.",
+  "options.planket.title": "Planket Settings",
+  "options.planket.category.general": "General",
   "options.planket.enable_inventory_tab": "Enable Survival Inventory Tab",
   "options.planket.creative_rows": "Item Rows In Tabs",
-  "options.planket.enable_scroller_memory": "Scroll Bar Position Memory",
-  "options.planket.enable_scroller_memory.tooltip": "Remembers the scroll bar position when switching tabs or closing the screen."
+  "options.planket.enable_scroll_memory": "Scroll Bar Position Memory",
+  "options.planket.enable_scroll_memory.tooltip": "Remembers the scroll bar position when switching tabs or closing the screen."
 }

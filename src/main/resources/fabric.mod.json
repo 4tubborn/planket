@@ -3,7 +3,7 @@
 	"id": "planket",
 	"version": "${version}",
 	"name": "planket",
-	"description": "Modifies Minecraft creative mode inventory style",
+	"description": "Modifies creative mode inventory style",
 	"authors": [
 		"4tubborn"
 	],

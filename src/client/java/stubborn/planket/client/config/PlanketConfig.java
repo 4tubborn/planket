@@ -15,11 +15,17 @@ public class PlanketConfig {
     private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("planket.json");
     private static PlanketConfig INSTANCE;
 
+    public static final boolean DEFAULT_INVENTORY_TAB = false;
+    public static final int DEFAULT_CREATIVE_ROWS = 6;
+    public static final boolean DEFAULT_SCROLL_MEMORY = true;
+
     // 默认不启用 Inventory 标签页（即隐藏它）
     //为了适配可变的行数，inventory实际上已经不可用了
-    public boolean enableInventoryTab = false;
-    public int creativeRows = 6;
-    public boolean enableScrollerMemory = true;
+    public boolean enableInventoryTab = DEFAULT_INVENTORY_TAB;
+    public int creativeRows = DEFAULT_CREATIVE_ROWS;
+    public boolean enableScrollMemory = DEFAULT_SCROLL_MEMORY;
+    //slot num
+    public static final int slotMaxCapacity = 135;
 
     public static PlanketConfig getInstance() {
         if (INSTANCE == null) {
