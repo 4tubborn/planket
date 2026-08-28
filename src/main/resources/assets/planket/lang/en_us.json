@@ -7,5 +7,7 @@
   "options.planket.enable_inventory_tab": "Enable Survival Inventory Tab",
   "options.planket.creative_rows": "Item Rows In Tabs",
   "options.planket.enable_scroll_memory": "Scroll Bar Position Memory",
-  "options.planket.enable_scroll_memory.tooltip": "Remembers the scroll bar position when switching tabs or closing the screen."
+  "options.planket.enable_scroll_memory.tooltip": "Remembers the scroll bar position when switching tabs or closing the screen.",
+  "options.planket.category.advanced": "Advanced",
+  "options.planket.max_creative_rows": "Max Item Rows"
 }

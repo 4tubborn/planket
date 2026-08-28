@@ -1,6 +1,5 @@
 package stubborn.planket.client.mixin;
 
-import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
@@ -33,9 +32,9 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import stubborn.planket.client.gui.InventoryPanel;
 import stubborn.planket.client.handler.KeyHandler;
+import stubborn.planket.client.util.CreativeGridUtil;
 import stubborn.planket.client.util.ScreenInterface;
 import stubborn.planket.client.config.PlanketConfig;
 import static stubborn.planket.client.PlanketClient.LOGGER;
@@ -68,6 +67,12 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
     @Unique
     private int planket$quickCraftStartData;
 
+    static {
+        NonNullList<ItemStack> newList = NonNullList.createWithCapacity(PlanketConfig.maxCreativeRows * 9);
+        for (int i = 0; i < PlanketConfig.maxCreativeRows * 9; i++) newList.add(ItemStack.EMPTY);
+        CONTAINER.items = newList;
+    }
+
     public CreativeInventoryScreenMixin(AbstractContainerMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
     }
@@ -87,12 +92,6 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 
         this.hasClickedOutside = result;
         return result;
-    }
-
-    static {
-        NonNullList<ItemStack> newList = NonNullList.createWithCapacity(PlanketConfig.slotMaxCapacity);
-        for (int i = 0; i < PlanketConfig.slotMaxCapacity; i++) newList.add(ItemStack.EMPTY);
-        CONTAINER.items = newList;
     }
 
     @Inject(method = "init", at = @At("HEAD"))
@@ -153,7 +152,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
     @WrapWithCondition(method = "renderBg(Lnet/minecraft/client/gui/GuiGraphics;FII)V",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiGraphics;blit(Lcom/mojang/blaze3d/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIFFIIII)V"))
     private boolean wrapLeftBackground(GuiGraphics guiGraphics, RenderPipeline pipeline, Identifier texture, int x, int y, float u, float v, int width, int height, int texWidth, int texHeight) {
-        if (PlanketConfig.getInstance().creativeRows <= 5) {
+        if (CreativeGridUtil.getVisibleRows() <= 5) {
             return true; // 执行原版 blit
         }
 
@@ -163,7 +162,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 
     @Unique
     private void drawDynamicLeftBg(GuiGraphics guiGraphics, RenderPipeline pipeline, Identifier texture, int leftX, int topY) {
-        int rows = PlanketConfig.getInstance().creativeRows;
+        int rows = CreativeGridUtil.getVisibleRows();
         // 纹理切片坐标
         int texTopHeight = 89;          // 顶部区域（标题、搜索框、前5行物品背景）
         int texRowHeight = 18;          // 每额外一行的背景高度
@@ -219,7 +218,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
     private void rebuildLeftPanel(Player player) {
         this.menu.slots.removeIf(s -> s.x < this.imageWidth);
 
-        int rows = PlanketConfig.getInstance().creativeRows;
+        int rows = CreativeGridUtil.getVisibleRows();
         // 添加 rows 行物品槽
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < 9; col++) {
@@ -296,7 +295,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
     }
     //滑块结束
     //禁用快捷栏
-    @ModifyArg(
+    /*@ModifyArg(
             method = "slotClicked",
             at = @At(
                     value = "INVOKE",
@@ -310,6 +309,14 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
         }
 
         return slotIndex;
+    }*/
+
+    @ModifyConstant(
+            method = "slotClicked",
+            constant = @Constant(intValue = 45)
+    )
+    private int planket$modifyHotbarStartIndex(int original) {
+        return CreativeGridUtil.getHotbarStartIndex();
     }
 
     /*@ModifyExpressionValue(method = "slotClicked",

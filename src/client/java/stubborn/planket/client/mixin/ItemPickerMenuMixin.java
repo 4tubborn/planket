@@ -14,46 +14,36 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import stubborn.planket.client.config.PlanketConfig;
+import stubborn.planket.client.util.CreativeGridUtil;
 
-@Mixin(targets = "net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen$ItemPickerMenu")
+@Mixin(CreativeModeInventoryScreen.ItemPickerMenu.class)
 public abstract class ItemPickerMenuMixin extends AbstractContainerMenu {
-
-    @Final
-    @Shadow
-    public NonNullList<ItemStack> items;
 
     protected ItemPickerMenuMixin(MenuType<?> type, int id) {
         super(type, id);
     }
 
-    @ModifyReturnValue(
+    @ModifyConstant(
             method = "calculateRowCount",
-            at = @At("RETURN")
+            constant = @Constant(intValue = 5)
     )
-    private int planket$modifyRowCount(int original) {
-        int rows = PlanketConfig.getInstance().creativeRows;
-
-        return Math.max(
-                Mth.positiveCeilDiv(this.items.size(), 9) - rows,
-                0
-        );
+    private int planket$modifyVisibleRows(int original) {
+        return CreativeGridUtil.getVisibleRows();
     }
 
-    @ModifyReturnValue(
+    @ModifyConstant(
             method = "canScroll",
-            at = @At("RETURN")
+            constant = @Constant(intValue = 45)
     )
-    private boolean planket$modifyCanScroll(boolean original) {
-        int rows = PlanketConfig.getInstance().creativeRows;
-
-        return this.items.size() > rows * 9;
+    private int planket$modifyVisibleSlotCapacity(int original) {
+        return CreativeGridUtil.getVisibleSlotCount();
     }
 
     @ModifyConstant(
             method = "scrollTo",
             constant = @Constant(intValue = 5)
     )
-    private int planket$modifyVisibleRows(int original) {
-        return PlanketConfig.getInstance().creativeRows;
+    private int planket$modifyVisibleRows2(int original) {
+        return CreativeGridUtil.getVisibleRows();
     }
 }

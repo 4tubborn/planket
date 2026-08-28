@@ -7,5 +7,7 @@
   "options.planket.enable_inventory_tab": "启用生存模式物品栏标签页",
   "options.planket.creative_rows": "标签页内物品行数",
   "options.planket.enable_scroll_memory": "滚动条位置记忆",
-  "options.planket.enable_scroll_memory.tooltip": "在切换标签页或关闭屏幕时记住滚动条的位置"
+  "options.planket.enable_scroll_memory.tooltip": "在切换标签页或关闭屏幕时记住滚动条的位置",
+  "options.planket.category.advanced": "高级",
+  "options.planket.max_creative_rows": "最大物品行数"
 }
