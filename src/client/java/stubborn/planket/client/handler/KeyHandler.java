@@ -7,9 +7,7 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import org.lwjgl.glfw.GLFW;
-
-import  net.fabricmc.fabric.api.client.itemgroup.v1.FabricCreativeInventoryScreen;
-
+import stubborn.planket.client.config.PlanketConfig;
 
 import java.util.List;
 
@@ -25,12 +23,19 @@ public class KeyHandler {
             return false;
         }
 
-        FabricCreativeInventoryScreen ext = (FabricCreativeInventoryScreen) screen;
+        FabricCreativeInventoryScreen ext = screen;
 
         int currentPage = ext.getCurrentPage();
         int pageCount = ext.getPageCount();
 
-        List<CreativeModeTab> pageTabs = ext.getItemGroupsOnPage(currentPage);
+        //ignore right tabs
+        List<CreativeModeTab> pageTabs = !PlanketConfig.getInstance().ignoreRightTabs ?
+                ext.getItemGroupsOnPage(currentPage) :
+                ext.getItemGroupsOnPage(ext.getCurrentPage())
+                .stream()
+                .filter(tab -> !tab.isAlignedRight())
+                .toList();
+
         if (pageTabs.isEmpty()) {
             return false;
         }

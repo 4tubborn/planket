@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+// JEI compat
 @Mixin(IngredientListOverlay.class)
 public class IngredientListOverlayMixin {
 

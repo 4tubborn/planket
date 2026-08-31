@@ -4,6 +4,7 @@ import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
 import me.shedaniel.clothconfig2.gui.entries.IntegerSliderEntry;
+import me.shedaniel.clothconfig2.impl.builders.SubCategoryBuilder;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -20,6 +21,7 @@ public final class PlanketConfigScreen {
 
         ConfigEntryBuilder entries = builder.entryBuilder();
 
+        // General Cate
         ConfigCategory general = builder.getOrCreateCategory(
                 Component.translatable("options.planket.category.general")
         );
@@ -36,7 +38,12 @@ public final class PlanketConfigScreen {
                         .build()
         );
 
-        general.addEntry(
+        // Functions Subcate
+        SubCategoryBuilder functions = entries
+                .startSubCategory(Component.translatable("options.planket.subcategory.functions"))
+                .setExpanded(true);
+
+        functions.add(
                 entries.startBooleanToggle(
                                 Component.translatable("options.planket.enable_scroll_memory"),
                                 config.enableScrollMemory
@@ -47,6 +54,20 @@ public final class PlanketConfigScreen {
                         .build()
         );
 
+        functions.add(
+                entries.startBooleanToggle(
+                                Component.translatable("options.planket.ignore_right_tabs"),
+                                config.ignoreRightTabs
+                        )
+                        .setDefaultValue(PlanketConfig.DEFAULT_IGNORE_RIGHT_TABS)
+                        .setTooltip(Component.translatable("options.planket.ignore_right_tabs.tooltip"))
+                        .setSaveConsumer(value -> config.ignoreRightTabs = value)
+                        .build()
+        );
+
+        general.addEntry(functions.build());
+
+        // Advanced Cate
         ConfigCategory advanced = builder.getOrCreateCategory(
                 Component.translatable("options.planket.category.advanced")
         );

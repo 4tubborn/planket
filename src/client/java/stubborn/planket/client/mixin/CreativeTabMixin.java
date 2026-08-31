@@ -21,8 +21,5 @@ public abstract class CreativeTabMixin {
         if (instance.getType() == CreativeModeTab.Type.INVENTORY) {
             cir.setReturnValue(false);
         }
-
-        // 或者如果你有自定义标签页的实例，也可以直接比对：
-        // if (instance == MyModTabs.MY_CUSTOM_TAB) { cir.setReturnValue(false); }
     }
 }

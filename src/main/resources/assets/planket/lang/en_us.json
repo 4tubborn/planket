@@ -6,8 +6,11 @@
   "options.planket.category.general": "General",
   "options.planket.enable_inventory_tab": "Enable Survival Inventory Tab",
   "options.planket.creative_rows": "Item Rows In Tabs",
+  "options.planket.subcategory.functions": "Functions",
   "options.planket.enable_scroll_memory": "Scroll Bar Position Memory",
   "options.planket.enable_scroll_memory.tooltip": "Remembers the scroll bar position when switching tabs or closing the screen.",
+  "options.planket.ignore_right_tabs": "Ignore Right Tabs",
+  "options.planket.ignore_right_tabs.tooltip": "Ignores tabs aligned to right when using shortcut keys.",
   "options.planket.category.advanced": "Advanced",
   "options.planket.max_creative_rows": "Max Item Rows"
 }

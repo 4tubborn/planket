@@ -23,6 +23,7 @@ public class PlanketConfig {
     public static final boolean DEFAULT_SCROLL_MEMORY = true;
     public static final int DEFAULT_MAX_CREATIVE_ROWS = 15;
     public static final int MAX_CREATIVE_ROWS_LIMIT = 100;
+    public static final boolean DEFAULT_IGNORE_RIGHT_TABS = false;
 
     // 默认不启用 Inventory 标签页（即隐藏它）
     //为了适配可变的行数，inventory实际上已经不可用了
@@ -30,6 +31,7 @@ public class PlanketConfig {
     public int creativeRows = DEFAULT_CREATIVE_ROWS;
     public boolean enableScrollMemory = DEFAULT_SCROLL_MEMORY;
     public static int maxCreativeRows = DEFAULT_MAX_CREATIVE_ROWS;
+    public boolean ignoreRightTabs = DEFAULT_IGNORE_RIGHT_TABS;
 
     @SerializedName("maxCreativeRows")
     private int serializedMaxCreativeRows = DEFAULT_MAX_CREATIVE_ROWS;
